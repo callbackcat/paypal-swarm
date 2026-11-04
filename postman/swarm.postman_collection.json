@@ -1,0 +1,633 @@
+{
+  "info": {
+    "name": "Swarm API",
+    "description": "Agentic-commerce flight simulator for PayPal merchants: start runs, stream events, approve refunds, read the readiness report.\n\nGenerated from /openapi.json by scripts/postman.ts. Set baseUrl; POST /runs stores runId for the other requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "0.1.0"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8787"
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "id",
+      "value": "{{runId}}"
+    },
+    {
+      "key": "approvalId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "platform",
+      "item": [
+        {
+          "name": "GET /healthz",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "healthz"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "runs",
+      "item": [
+        {
+          "name": "GET /scenarios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/scenarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "scenarios"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "POST /runs/estimate",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/estimate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "estimate"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"black-friday\",\n  \"merchantProfile\": \"baseline\",\n  \"shoppers\": 25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST /runs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scenario\": \"quiet-tuesday\",\n  \"merchantProfile\": \"baseline\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j.id) pm.environment.set(\"runId\", j.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /runs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "GET /runs/{id}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "GET /runs/{id}/events.json",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/events.json?since=&limit=&type=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "events.json"
+              ],
+              "query": [
+                {
+                  "key": "since",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /runs/{id}/pause",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/pause",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "pause"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "POST /runs/{id}/resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/resume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "resume"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "POST /runs/{id}/stop",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/stop",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "stop"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "GET /runs/{id}/personas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/personas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "personas"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "POST /runs/{id}/rerun",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/rerun",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "rerun"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchantProfile\": \"hardened\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Live event stream (SSE)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/events?since=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "events"
+              ],
+              "query": [
+                {
+                  "key": "since",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Server-sent events. `?since=<eventId>` replays from the log first (also honours Last-Event-ID). Heartbeat comment every 15 s. Sends `event: done` when the run has finished."
+          }
+        }
+      ]
+    },
+    {
+      "name": "approvals",
+      "item": [
+        {
+          "name": "GET /runs/{id}/approvals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/approvals?pending=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "approvals"
+              ],
+              "query": [
+                {
+                  "key": "pending",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /runs/{id}/approvals/{approvalId}",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/approvals/{{approvalId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "approvals",
+                "{{approvalId}}"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"granted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "report",
+      "item": [
+        {
+          "name": "GET /runs/{id}/report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/report?format=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "report"
+              ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /runs/{id}/findings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/findings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "findings"
+              ],
+              "query": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "webhooks",
+      "item": [
+        {
+          "name": "GET /runs/{id}/webhooks",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/{{id}}/webhooks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                "{{id}}",
+                "webhooks"
+              ],
+              "query": []
+            }
+          }
+        },
+        {
+          "name": "PayPal webhook receiver",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/paypal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                "paypal"
+              ],
+              "query": []
+            },
+            "description": "Register this URL in the PayPal developer dashboard (Sandbox → Webhooks). Signature is verified with PAYPAL_WEBHOOK_ID when set; unverified deliveries are stored but flagged.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"WH-TEST-0000000001\",\n  \"event_type\": \"PAYMENT.CAPTURE.COMPLETED\",\n  \"resource\": {\n    \"id\": \"{{captureId}}\",\n    \"status\": \"COMPLETED\",\n    \"supplementary_data\": {\n      \"related_ids\": {\n        \"order_id\": \"{{orderId}}\"\n      }\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "studio",
+      "item": [
+        {
+          "name": "LLM turn for the AG Studio analyst (NDJSON stream of AG-UI style frames)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/ai/studio-turn",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "studio-turn"
+              ],
+              "query": []
+            },
+            "description": "LLM turn for the AG Studio analyst (NDJSON stream of AG-UI style frames)",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"runId\": \"{{runId}}\",\n  \"items\": [\n    {\n      \"type\": \"message\",\n      \"role\": \"user\",\n      \"content\": \"Which orders were captured without tracking? Build a table.\"\n    }\n  ],\n  \"tools\": [\n    {\n      \"name\": \"addWidget\",\n      \"description\": \"Add a widget to the page\",\n      \"parameters\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"title\": {\n            \"type\": \"string\"\n          }\n        }\n      }\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

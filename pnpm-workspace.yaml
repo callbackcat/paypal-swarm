@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+overrides:
+  vite: 6.3.6
+  zod: 3.25.76
+onlyBuiltDependencies:
+  - esbuild

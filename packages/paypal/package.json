@@ -1,0 +1,27 @@
+{
+  "name": "@swarm/paypal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@paypal/agent-toolkit": "1.11.0",
+    "@paypal/paypal-server-sdk": "2.5.0",
+    "ai": "6.0.322",
+    "zod": "3.25.76",
+    "@swarm/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4",
+    "@types/node": "^20.19.0"
+  }
+}

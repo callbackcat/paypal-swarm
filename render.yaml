@@ -1,0 +1,82 @@
+# Render blueprint: web (Next.js) + api (Hono + run executor) + Postgres.
+# Deploy: Render dashboard → Blueprints → New → this repo. Then fill the `sync: false` secrets.
+# Everything works with no secrets at all (mock PayPal + scripted agents); add them to go live.
+services:
+  - type: web
+    name: swarm-api
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && corepack prepare pnpm@10.30.3 --activate && pnpm install --frozen-lockfile && pnpm --filter @swarm/db db:migrate
+    startCommand: pnpm --filter @swarm/api start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: swarm-db
+          property: connectionString
+      - key: SWARM_KMS_KEY
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*" # tighten to https://<swarm-web host> once you know it
+      - key: PUBLIC_API_URL
+        fromService:
+          type: web
+          name: swarm-api
+          property: host
+      - key: DEMO_DAILY_TOKEN_CAP
+        value: "1500000"
+      - key: SWARM_RUN_TOKEN_CAP
+        value: "400000"
+      - key: LLM_CACHE
+        value: "0"
+      - key: SWARM_MODEL_SHOPPER
+        value: anthropic/claude-haiku-5.5
+      - key: SWARM_MODEL_MERCHANT
+        value: anthropic/claude-sonnet-5.5
+      - key: SWARM_MODEL_ANALYST
+        value: anthropic/claude-sonnet-5.5
+      # --- secrets: set in the dashboard; leave empty to stay in mock / scripted mode ---
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_MERCHANT_ID
+        sync: false
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+  - type: web
+    name: swarm-web
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && corepack prepare pnpm@10.30.3 --activate && pnpm install --frozen-lockfile && pnpm --filter @swarm/web build
+    startCommand: pnpm --filter @swarm/web start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      # The web app is built with the api hostname inlined (https:// is added at build time).
+      - key: NEXT_PUBLIC_API_HOST
+        fromService:
+          type: web
+          name: swarm-api
+          property: host
+      - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
+        sync: false
+
+databases:
+  - name: swarm-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "16"

@@ -1,0 +1,1207 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Swarm API",
+    "version": "0.1.0",
+    "description": "Agentic-commerce flight simulator for PayPal merchants: start runs, stream events, approve refunds, read the readiness report."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8787"
+    }
+  ],
+  "components": {
+    "schemas": {},
+    "parameters": {}
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "responses": {
+          "200": {
+            "description": "Service health, storage kind and which integrations are configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scenarios": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Scenario presets with token/cost estimates and the per-agent PayPal allow-lists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/estimate": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scenario": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "merchantProfile": {
+                    "type": "string",
+                    "enum": [
+                      "baseline",
+                      "hardened"
+                    ],
+                    "default": "baseline"
+                  },
+                  "shoppers": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  },
+                  "tokenCap": {
+                    "type": "integer",
+                    "minimum": 5000,
+                    "maximum": 5000000
+                  },
+                  "personaSeed": {
+                    "type": "integer"
+                  },
+                  "models": {
+                    "type": "object",
+                    "properties": {
+                      "shopper": {
+                        "type": "string"
+                      },
+                      "merchant": {
+                        "type": "string"
+                      },
+                      "analyst": {
+                        "type": "string"
+                      }
+                    },
+                    "default": {}
+                  },
+                  "approvalThresholdUsd": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 50
+                  },
+                  "approvalTimeoutSec": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "default": 120
+                  },
+                  "paypal": {
+                    "type": "string",
+                    "enum": [
+                      "mock",
+                      "sandbox",
+                      "auto"
+                    ],
+                    "default": "auto"
+                  },
+                  "llm": {
+                    "type": "string",
+                    "enum": [
+                      "scripted",
+                      "live",
+                      "auto"
+                    ],
+                    "default": "auto"
+                  },
+                  "llmCache": {
+                    "type": "boolean"
+                  },
+                  "credentials": {
+                    "type": "object",
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "clientSecret": {
+                        "type": "string"
+                      },
+                      "merchantId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "clientSecret"
+                    ]
+                  },
+                  "openrouterApiKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "scenario"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token and USD estimate before anything is spent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scenario": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "merchantProfile": {
+                    "type": "string",
+                    "enum": [
+                      "baseline",
+                      "hardened"
+                    ],
+                    "default": "baseline"
+                  },
+                  "shoppers": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  },
+                  "tokenCap": {
+                    "type": "integer",
+                    "minimum": 5000,
+                    "maximum": 5000000
+                  },
+                  "personaSeed": {
+                    "type": "integer"
+                  },
+                  "models": {
+                    "type": "object",
+                    "properties": {
+                      "shopper": {
+                        "type": "string"
+                      },
+                      "merchant": {
+                        "type": "string"
+                      },
+                      "analyst": {
+                        "type": "string"
+                      }
+                    },
+                    "default": {}
+                  },
+                  "approvalThresholdUsd": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 50
+                  },
+                  "approvalTimeoutSec": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "default": 120
+                  },
+                  "paypal": {
+                    "type": "string",
+                    "enum": [
+                      "mock",
+                      "sandbox",
+                      "auto"
+                    ],
+                    "default": "auto"
+                  },
+                  "llm": {
+                    "type": "string",
+                    "enum": [
+                      "scripted",
+                      "live",
+                      "auto"
+                    ],
+                    "default": "auto"
+                  },
+                  "llmCache": {
+                    "type": "boolean"
+                  },
+                  "credentials": {
+                    "type": "object",
+                    "properties": {
+                      "clientId": {
+                        "type": "string"
+                      },
+                      "clientSecret": {
+                        "type": "string"
+                      },
+                      "merchantId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "clientId",
+                      "clientSecret"
+                    ]
+                  },
+                  "openrouterApiKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "scenario"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Run created and started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Over cap or bad config",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demo allowance exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Run status with live token counters, pending approvals and the order board",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/events.json": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "default": 0
+            },
+            "required": false,
+            "name": "since",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMinimum": true,
+              "maximum": 5000,
+              "default": 2000
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paged event log (JSON). Use /runs/{id}/events for SSE.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/pause": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "pause the run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/resume": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "resume the run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/stop": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "stop the run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run not active",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/approvals": {
+      "get": {
+        "tags": [
+          "approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1",
+                "0"
+              ],
+              "default": "0"
+            },
+            "required": false,
+            "name": "pending",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Approvals for the run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/approvals/{approvalId}": {
+      "post": {
+        "tags": [
+          "approvals"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "approvalId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "granted",
+                      "denied"
+                    ]
+                  }
+                },
+                "required": [
+                  "decision"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Decision recorded; the merchant continues",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already decided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/report": {
+      "get": {
+        "tags": [
+          "report"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "json",
+                "md"
+              ],
+              "default": "json"
+            },
+            "required": false,
+            "name": "format",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Agent-readiness report (JSON or Markdown)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/findings": {
+      "get": {
+        "tags": [
+          "report"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Findings only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/personas": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shopper personas of the run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/webhooks": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhooks matched to this run, with lag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/rerun": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "merchantProfile": {
+                    "type": "string",
+                    "enum": [
+                      "baseline",
+                      "hardened"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New run started with the same config (and credentials) and the given merchant profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/events": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Live event stream (SSE)",
+        "description": "Server-sent events. `?since=<eventId>` replays from the log first (also honours Last-Event-ID). Heartbeat comment every 15 s. Sends `event: done` when the run has finished.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "run_1a2b3c4d5e6f"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0
+            },
+            "required": false,
+            "name": "since",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/event-stream"
+          }
+        }
+      }
+    },
+    "/webhooks/paypal": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "PayPal webhook receiver",
+        "description": "Register this URL in the PayPal developer dashboard (Sandbox → Webhooks). Signature is verified with PAYPAL_WEBHOOK_ID when set; unverified deliveries are stored but flagged.",
+        "responses": {
+          "200": {
+            "description": "Always 200 so PayPal does not retry forever"
+          }
+        }
+      }
+    },
+    "/ai/studio-turn": {
+      "post": {
+        "tags": [
+          "studio"
+        ],
+        "summary": "LLM turn for the AG Studio analyst (NDJSON stream of AG-UI style frames)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "runId": {
+                    "type": "string"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "system": {
+                    "type": "string"
+                  },
+                  "maxOutputTokens": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "exclusiveMinimum": true,
+                    "maximum": 4000
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "message"
+                              ]
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "assistant",
+                                "system"
+                              ]
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "role",
+                            "content"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "tool_call"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "arguments": {
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "id",
+                            "name"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "tool_result"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "output": {
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "id"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "tools": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "default": []
+                  },
+                  "responseFormat": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "json"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "schema": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "name",
+                      "schema"
+                    ]
+                  }
+                },
+                "required": [
+                  "items"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "application/x-ndjson: RUN_STARTED, TEXT_MESSAGE_CHUNK, TOOL_CALL_START/ARGS/END, RUN_FINISHED | RUN_ERROR"
+          }
+        }
+      }
+    }
+  }
+}

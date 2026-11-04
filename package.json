@@ -1,0 +1,44 @@
+{
+  "name": "paypal-swarm",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Swarm: an agentic-commerce flight simulator for PayPal merchants (LLM shoppers, merchant agent, chaos agent, readiness report)",
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=20.14 <23"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck && tsc -p tsconfig.json",
+    "spike:approval": "tsx scripts/spike-approval.ts",
+    "spike:chargeback": "tsx scripts/spike-chargeback.ts",
+    "seed": "tsx scripts/seed-demo-store.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "dev:api": "pnpm --filter @swarm/api dev",
+    "dev:web": "pnpm --filter @swarm/web dev",
+    "db:migrate": "pnpm --filter @swarm/db db:migrate",
+    "postman": "tsx scripts/postman.ts",
+    "art": "node scripts/render-swarm.mjs"
+  },
+  "dependencies": {
+    "@paypal/agent-toolkit": "1.11.0",
+    "@paypal/paypal-server-sdk": "2.5.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@swarm/agents": "workspace:*",
+    "@swarm/core": "workspace:*",
+    "@swarm/db": "workspace:*",
+    "@swarm/paypal": "workspace:*",
+    "@types/node": "^20.19.0",
+    "ascii-magic-art": "^1.1.0",
+    "tsx": "^4.23.15",
+    "turbo": "^2.11.10",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

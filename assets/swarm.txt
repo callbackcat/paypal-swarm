@@ -1,0 +1,27 @@
+ swarm · black-friday · 40 shoppers · PayPal sandbox · LLM live   tokens 199k/600k $0.37  score 61 → 94 
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+                                                                                  event log             
+  Shoppers LLM personas · Haiku                                                         ╭─────────────╮ 
+                                                                                    •●──│ Arena     ○ │ 
+                                                                                    │   ╰─────────────╯ 
+             ·····                                                                  │    live SSE feed  
+         ············        browse ╭──────────────────╮     pay_order              ●                   
+    ● Maya•$80 · impatient  •●─•●─•●│ Merchant agent ○ │●───•                       • ⚠ approval pending
+      ···•••••••••••····            ╰──────────────────╯──● ●                       │                   
+     ···•●●••••••••••····            toolkit · Sonnet     • │                       │                   
+     ··•••●•••••••••·····            capture lock on      │ │  ╔════════════════╗   ●   ╭─────────────╮ 
+    ··●·Jonas●$250 · bargain                  │           │ │──║ PayPal       ○ ║•●─•───│ Report    ○ │ 
+    ·····•••••••••••·····                     │  webhooks ╰─│●•╚════════════════╝   │   ╰─────────────╯ 
+     ········•••••••••···   ●─•●────•●─•●─•●─•●─•●─•●───────│   sandbox / mock      │    score + fixes  
+     ········••••••·····     create_order     │replay       │   orders 114 422 ×3   │                   
+       ······•••••·····                       │             │                       • NO_TRACKING ×3    
+         ····•••·····                         ●             │                       ●                   
+           ·······                            •             ●                       │                   
+                                    ╭──────────────────╮    •                       │   ╭─────────────╮ 
+                                    │ Chaos agent    ○ │────╯                       ╰───│ Studio    ○ │ 
+                                    ╰──────────────────╯ chargeback                     ╰─────────────╯ 
+                                     declines · chargebacks                              analyst agent  
+                                     next: decline 10 %                                                 
+────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ● shopper  ● merchant  ● chaos  ● paypal  ● webhook  ● finding  ● approval    1 real min = 1 sim hour  
+                                                                                                        

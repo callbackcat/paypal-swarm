@@ -1,0 +1,54 @@
+name: nightly-smoke
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC daily
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: swarm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/swarm
+      # Optional: with these secrets present the smoke runs against the PayPal sandbox with live Claude shoppers.
+      PAYPAL_CLIENT_ID: ${{ secrets.PAYPAL_CLIENT_ID }}
+      PAYPAL_CLIENT_SECRET: ${{ secrets.PAYPAL_CLIENT_SECRET }}
+      PAYPAL_MERCHANT_ID: ${{ secrets.PAYPAL_MERCHANT_ID }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      SWARM_RUN_TOKEN_CAP: "60000" # hard ceiling for the nightly: two shoppers never need more
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm --filter @swarm/db db:migrate
+      - name: Smoke run (Quiet Tuesday, 2 shoppers, hardened merchant)
+        run: pnpm smoke -- --shoppers 2 --profile hardened --fast --fixture fixtures/nightly.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-fixture
+          path: fixtures/nightly.jsonl
+          if-no-files-found: ignore
