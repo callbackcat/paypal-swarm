@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtTokens, fmtUsd, type Estimate, type Modes, type RunConfigInput, type RunListItem, type ScenariosResponse } from "@/lib/api";
-import { ErrorAlert, ModeTags, RunStatus } from "@/components/ui";
+import { ErrorAlert, ModeTags, RunStatus, ScenarioListSkeleton, ValueSkeleton } from "@/components/ui";
 import { ArrowUpRight, Icon } from "@/components/sodium/icon";
 import { Button } from "@/components/sodium/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
@@ -150,7 +150,7 @@ export default function SetupPage() {
           <Frame aria-label="Scenario">
             <FrameHeader>
               <FrameTitle>Scenario</FrameTitle>
-              <FrameValue meta>{data ? `${ready.length} ready` : error ? "unavailable" : "loading"}</FrameValue>
+              {data ? <FrameValue meta>{`${ready.length} ready`}</FrameValue> : error ? <FrameValue meta>unavailable</FrameValue> : <ValueSkeleton type="code-sm" width="w-16" />}
             </FrameHeader>
             <FrameBody>
               {data ? (
@@ -166,7 +166,7 @@ export default function SetupPage() {
                   ))}
                 </RadioGroup>
               ) : (
-                <FrameDescription>{error ? "Scenarios could not be loaded. Fix the api connection described above and reload." : "Loading scenarios from the api."}</FrameDescription>
+                error ? <FrameDescription>Scenarios could not be loaded. Fix the api connection described above and reload.</FrameDescription> : <ScenarioListSkeleton />
               )}
             </FrameBody>
             {current && current.status === "ready" && (
@@ -341,27 +341,27 @@ export default function SetupPage() {
           <Frame variant="panel" aria-label="Estimate">
             <FrameHeader>
               <FrameTitle>Estimate</FrameTitle>
-              {current && <FrameValue meta>{current.name}</FrameValue>}
+              {current ? <FrameValue meta>{current.name}</FrameValue> : !error && <ValueSkeleton type="code-sm" width="w-28" />}
             </FrameHeader>
             <FrameBody padding="none">
               <DataList className="px-inset">
                 <DataListItem>
                   <DataListLabel>Modes</DataListLabel>
                   <DataListValue>
-                    <ModeTags modes={estimate?.modes ?? data?.modes ?? null} />
+                    {(estimate?.modes ?? data?.modes) ? <ModeTags modes={estimate?.modes ?? data?.modes ?? null} /> : error ? null : <ValueSkeleton width="w-44" />}
                   </DataListValue>
                 </DataListItem>
                 <DataListItem>
                   <DataListLabel>Shoppers</DataListLabel>
-                  <DataListValue>{current ? String(estimate?.shoppers ?? current.shoppers) : null}</DataListValue>
+                  <DataListValue>{current ? String(estimate?.shoppers ?? current.shoppers) : error ? null : <ValueSkeleton width="w-8" />}</DataListValue>
                 </DataListItem>
                 <DataListItem>
                   <DataListLabel>Tokens</DataListLabel>
-                  <DataListValue>{current ? `${estimating ? "..." : fmtTokens(est?.tokens)} / ${fmtTokens(estimate?.tokenCap ?? current.tokenCap)}` : null}</DataListValue>
+                  <DataListValue>{current ? estimating ? <ValueSkeleton width="w-32" /> : `${fmtTokens(est?.tokens)} / ${fmtTokens(estimate?.tokenCap ?? current.tokenCap)}` : error ? null : <ValueSkeleton width="w-32" />}</DataListValue>
                 </DataListItem>
                 <DataListItem>
                   <DataListLabel>Cost</DataListLabel>
-                  <DataListValue>{current ? (estimating ? "..." : fmtUsd(est?.usd, 3)) : null}</DataListValue>
+                  <DataListValue>{current ? estimating ? <ValueSkeleton width="w-16" /> : fmtUsd(est?.usd, 3) : error ? null : <ValueSkeleton width="w-16" />}</DataListValue>
                 </DataListItem>
                 {est &&
                   est.tokens > 0 &&

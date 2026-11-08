@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtLag, fmtSim, fmtTokens, fmtUsd, isTerminal, subscribe, type RunStatus as RunStatusView, type SwarmEvent } from "@/lib/api";
 import { applyEvent, emptyArena, summarize, type ArenaState } from "@/lib/arena";
-import { ErrorAlert, LinkButton, ModeTags, OrderStatusTag, RunStatus } from "@/components/ui";
+import { ErrorAlert, LinkButton, ModeTags, OrderStatusTag, RunStatus, ValueSkeleton } from "@/components/ui";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/sodium/ui/alert";
 import { Button } from "@/components/sodium/ui/button";
 import { DataList, DataListItem, DataListLabel, DataListValue } from "@/components/sodium/ui/data-list";
@@ -154,7 +154,14 @@ export default function ArenaPage() {
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="type-title">{run?.name ?? "Run"}</h1>
+          {run ? (
+            <h1 className="type-title">{run.name}</h1>
+          ) : (
+            <>
+              <h1 className="sr-only">Run</h1>
+              <ValueSkeleton type="heading" width="w-72" />
+            </>
+          )}
           <p className="type-code-sm text-text-2">
             {id}, sim clock {fmtSim(state.simT)}, {state.total} events
             {state.started ? `, ${String(state.started.shoppers)} shoppers, catalog ${String(state.started.catalogSize)}` : ""}

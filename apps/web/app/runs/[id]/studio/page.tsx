@@ -2,9 +2,9 @@
 import dynamic from "next/dynamic";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { LinkButton } from "@/components/ui";
+import { LinkButton, StudioSkeleton } from "@/components/ui";
 
-const SwarmStudio = dynamic(() => import("@/components/SwarmStudio"), { ssr: false, loading: () => <p className="type-body-sm text-text-2">Loading AG Studio.</p> });
+const SwarmStudio = dynamic(() => import("@/components/SwarmStudio"), { ssr: false, loading: () => <StudioSkeleton /> });
 
 function StudioInner({ id }: { id: string }) {
   const search = useSearchParams();
@@ -26,7 +26,7 @@ export default function StudioPage() {
           <LinkButton href={`/runs/${id}/report`}>Report</LinkButton>
         </div>
       </div>
-      <Suspense fallback={<p className="type-body-sm text-text-2">Loading.</p>}>
+      <Suspense fallback={<StudioSkeleton />}>
         <StudioInner id={id} />
       </Suspense>
     </>

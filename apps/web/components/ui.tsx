@@ -6,6 +6,7 @@ import { API } from "@/lib/api";
 import type { OrderRow } from "@/lib/arena";
 import { Alert, AlertDescription, AlertTitle } from "@/components/sodium/ui/alert";
 import { Button } from "@/components/sodium/ui/button";
+import { Skeleton, SkeletonRows, SkeletonText } from "@/components/sodium/ui/skeleton";
 import { Status, type StatusValue } from "@/components/sodium/ui/status";
 import { Tag } from "@/components/sodium/ui/tag";
 
@@ -77,6 +78,40 @@ export function ModeTags({ modes, size = "sm" }: { modes: Pick<Modes, "paypal" |
 }
 
 /** Turns a thrown error into a sentence that says what to do. A failed fetch is almost always the api not running. */
+/** A value's skeleton inside a DataList, status strip or meta line: one line of the given type role at a fixed width. */
+export function ValueSkeleton({ type = "code", width = "w-24" }: { type?: ComponentProps<typeof SkeletonText>["type"]; width?: string }) {
+  return <SkeletonText type={type} className={width} />;
+}
+
+/** The Scenario radio list while the scenarios load: four options, each a mark, a name and a two-line description. */
+export function ScenarioListSkeleton() {
+  return (
+    <div className="flex flex-col gap-4" aria-busy>
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className="flex items-start gap-3">
+          <Skeleton className="mt-1 size-4" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <SkeletonText type="body" className="w-40" />
+            <SkeletonText type="body-sm" lines={2} last={0.55} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The Studio while its bundle or the run data loads: the meta line and the host frame at their final heights. */
+export function StudioSkeleton() {
+  return (
+    <div className="flex flex-col gap-3" aria-busy>
+      <SkeletonText type="code-sm" lines={2} last={0.7} className="max-w-xl" />
+      <div className="ag-studio-host frame overflow-hidden">
+        <SkeletonRows rows={8} />
+      </div>
+    </div>
+  );
+}
+
 export function describeError(error: unknown): string {
   const message = String((error as Error)?.message ?? error);
   if (/failed to fetch|networkerror|load failed/i.test(message)) return `The api at ${API} did not answer. Start it (pnpm dev in apps/api) or point NEXT_PUBLIC_API_URL at a running one, then reload.`;

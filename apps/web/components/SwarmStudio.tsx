@@ -6,7 +6,7 @@ import { api, fmtSim, subscribe, type Finding, type Report, type RunStatus, type
 import { applyEvent, emptyArena, reduceAll, summarize, type ArenaState, type OrderRow } from "@/lib/arena";
 import { swarmAdapter } from "@/lib/studioAdapter";
 import { quietLicenceBanner } from "@/lib/quietLicenceBanner";
-import { ErrorAlert } from "@/components/ui";
+import { ErrorAlert, StudioSkeleton } from "@/components/ui";
 
 type Row = Record<string, string | number | boolean | null>;
 
@@ -192,7 +192,7 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
   );
 
   if (error) return <ErrorAlert error={error} />;
-  if (!data) return <p className="type-body-sm text-text-2">Loading run data.</p>;
+  if (!data) return <StudioSkeleton />;
   const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY || undefined;
   // Installed during render so it is in place before AG Studio mounts and prints its banner.
   if (!licenseKey) quietLicenceBanner();
