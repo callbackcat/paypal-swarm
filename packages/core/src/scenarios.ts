@@ -57,7 +57,7 @@ export const SCENARIOS: Scenario[] = [
     durationMin: 4,
     shopperTurns: 6,
     personaSeed: 7,
-    estimate: { tokens: 45_000, usd: 0.06 },
+    estimate: { tokens: 68_000, usd: 0.08 },
   }),
   ScenarioSchema.parse({
     id: "black-friday",
@@ -76,8 +76,8 @@ export const SCENARIOS: Scenario[] = [
       { kind: "duplicate_approval", after: { type: "order.approved", count: 3 }, count: 2 },
       { kind: "rate_limit", at: 90, params: { every: 12 } },
     ],
-    tokenCap: 600_000,
-    estimate: { tokens: 460_000, usd: 0.35 },
+    tokenCap: 800_000,
+    estimate: { tokens: 645_000, usd: 0.56 },
   }),
   ScenarioSchema.parse({
     id: "dispute-storm",
@@ -93,7 +93,7 @@ export const SCENARIOS: Scenario[] = [
       { kind: "oversized_refund", after: { type: "order.captured", count: 4 }, count: 2 },
       { kind: "double_refund", after: { type: "order.refunded", count: 1 }, count: 1 },
     ],
-    estimate: { tokens: 170_000, usd: 0.17 },
+    estimate: { tokens: 252_000, usd: 0.24 },
   }),
   ScenarioSchema.parse({
     id: "lost-parcels",
@@ -105,7 +105,7 @@ export const SCENARIOS: Scenario[] = [
     shopperTurns: 7,
     personaSeed: 31,
     chaos: [{ kind: "lost_parcel", after: { type: "order.captured", count: 1 }, rate: 0.5, params: { afterSimMinutes: 180 } }],
-    estimate: { tokens: 110_000, usd: 0.1 },
+    estimate: { tokens: 165_000, usd: 0.15 },
   }),
   ScenarioSchema.parse({ id: "subscription-churn", name: "Subscription churn", tagline: "Plans, renewals and cancellations.", description: "Coming soon.", status: "coming", shoppers: 10, durationMin: 5, estimate: { tokens: 0, usd: 0 } }),
   ScenarioSchema.parse({ id: "confused-agent", name: "Confused agent", tagline: "A buyer agent with a vague brief and a tight budget.", description: "Coming soon.", status: "coming", shoppers: 5, durationMin: 4, estimate: { tokens: 0, usd: 0 } }),

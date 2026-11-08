@@ -46,7 +46,10 @@ export interface RunConfigInput {
 export interface BudgetSnapshot {
   tokensIn: number;
   tokensOut: number;
+  tokensCached?: number;
+  /** Billable tokens (uncached input + output), compared with the cap. */
   total: number;
+  rawTotal?: number;
   costUsd: number;
   cap: number;
   fraction: number;

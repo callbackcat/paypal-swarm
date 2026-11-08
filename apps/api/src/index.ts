@@ -21,10 +21,16 @@ async function main() {
   const bus = new Bus();
   const manager = new RunManager(store, bus, readEnv);
   const app = createApp({ store, bus, manager, env: readEnv });
-  serve({ fetch: app.fetch, port: env.port }, () => {
+  const server = serve({ fetch: app.fetch, port: env.port }, () => {
     console.log(`swarm-api ${envFile ? `(env from ${envFile}) ` : ""}listening on http://localhost:${env.port}`);
     console.log(`  storage ${store.kind} · PayPal ${env.paypal ? "sandbox" : "mock"} · LLM ${env.openrouterKey ? "live via OpenRouter" : "scripted"} · webhooks ${env.webhookId ? "verified" : "off"} · docs /docs`);
   });
+  // Pollers reuse a socket every few seconds; the Node default of 5 s closes it between polls and the client sees ECONNRESET.
+  const node = server as unknown as { keepAliveTimeout?: number; headersTimeout?: number };
+  if (typeof node.keepAliveTimeout === "number") {
+    node.keepAliveTimeout = 65_000;
+    node.headersTimeout = 66_000;
+  }
 }
 
 main().catch((e) => {

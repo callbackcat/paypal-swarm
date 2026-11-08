@@ -113,6 +113,21 @@ async function execute(runId: string, config: RunConfig, deps: RunDeps, control:
     ),
   );
 
+  // Settle: the shoppers are done within a few real minutes, but the SLAs are measured in simulated hours
+  // (tracking within 24 h, disputes answered, parcels asked after). Fast-forward the clock an hour at a time
+  // so the chaos watches, the merchant and the rules see the whole day, bounded in real time.
+  const SETTLE_TO = 25 * 60;
+  if (!control.stopped && clock.now() < SETTLE_TO) {
+    const settleStart = Date.now();
+    const settleBudgetMs = Math.min(scenario.durationMin * 60_000, Math.max(20_000, pacing.settleStepMs * 30));
+    await world.emit("run.settling", "platform", "platform", { fromSimMinutes: clock.now(), toSimMinutes: SETTLE_TO, note: "shoppers are done; the clock fast-forwards so 24-hour SLAs can be judged" });
+    while (!control.stopped && clock.now() < SETTLE_TO && Date.now() - settleStart < settleBudgetMs) {
+      clock.jump(60);
+      await world.sleep(pacing.settleStepMs);
+      while (!control.stopped && world.merchantBusy && Date.now() - settleStart < settleBudgetMs) await world.sleep(Math.min(500, pacing.settleStepMs));
+    }
+  }
+
   // Drain: let the merchant and chaos finish what is queued, then stop everyone. A merchant turn that is in
   // flight counts as queued work (the inbox empties when the batch is taken), and gets a bounded grace period
   // past drainMs so a live model is not aborted mid-capture.

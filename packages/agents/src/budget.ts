@@ -33,13 +33,17 @@ export const DEFAULT_LIMITS: BudgetLimits = {
 export interface BudgetSnapshot {
   tokensIn: number;
   tokensOut: number;
+  /** Cached prefix reads, already included in tokensIn. */
+  tokensCached: number;
+  /** Billable tokens (uncached input + output); the caps compare against this. */
   total: number;
+  rawTotal: number;
   costUsd: number;
   cap: number;
   fraction: number;
   warned: boolean;
   exhausted: boolean;
-  actors: Record<string, { total: number; costUsd: number }>;
+  actors: Record<string, { total: number; rawTotal: number; costUsd: number }>;
 }
 
 export type BudgetEvent = { type: "budget.warning" | "budget.exhausted"; actor: string; payload: Record<string, unknown> };
@@ -54,7 +58,8 @@ export class BudgetGuard {
   private tokensIn = 0;
   private tokensOut = 0;
   private costUsd = 0;
-  private actors = new Map<string, { in: number; out: number; cost: number }>();
+  private tokensCached = 0;
+  private actors = new Map<string, { in: number; out: number; cached: number; cost: number }>();
   private warned = false;
   private exhaustedRun = false;
   private exhaustedActors = new Set<string>();
@@ -66,7 +71,12 @@ export class BudgetGuard {
     this.limits = { ...DEFAULT_LIMITS, ...limits };
   }
 
+  /** Billable tokens: uncached input plus output. This is what the caps and the Arena meter count. */
   get total() {
+    return this.tokensIn - this.tokensCached + this.tokensOut;
+  }
+  /** Every token that went through a model, cached prefix reads included. */
+  get rawTotal() {
     return this.tokensIn + this.tokensOut;
   }
   get isExhausted() {
@@ -105,10 +115,11 @@ export class BudgetGuard {
       return { ok: false, reason: "run" };
     }
     const a = this.actors.get(actor);
-    if (a && a.in + a.out >= this.capFor(kind)) {
+    const spent = a ? a.in - a.cached + a.out : 0;
+    if (a && spent >= this.capFor(kind)) {
       if (!this.exhaustedActors.has(actor)) {
         this.exhaustedActors.add(actor);
-        this.onEvent({ type: "budget.exhausted", actor, payload: { actor, kind, tokens: a.in + a.out, cap: this.capFor(kind), action: "scripted fallback" } });
+        this.onEvent({ type: "budget.exhausted", actor, payload: { actor, kind, tokens: spent, rawTokens: a.in + a.out, cap: this.capFor(kind), action: "scripted fallback" } });
       }
       return { ok: false, reason: "actor" };
     }
@@ -119,9 +130,12 @@ export class BudgetGuard {
     this.tokensIn += usage.inputTokens;
     this.tokensOut += usage.outputTokens;
     this.costUsd += usage.costUsd;
-    const a = this.actors.get(actor) ?? { in: 0, out: 0, cost: 0 };
+    const cached = Math.min(usage.cachedTokens ?? 0, usage.inputTokens);
+    this.tokensCached += cached;
+    const a = this.actors.get(actor) ?? { in: 0, out: 0, cached: 0, cost: 0 };
     a.in += usage.inputTokens;
     a.out += usage.outputTokens;
+    a.cached += cached;
     a.cost += usage.costUsd;
     this.actors.set(actor, a);
     if (this.total >= this.limits.runTokenCap) this.markRunExhausted(actor);
@@ -137,35 +151,42 @@ export class BudgetGuard {
     return {
       tokensIn: this.tokensIn,
       tokensOut: this.tokensOut,
+      tokensCached: this.tokensCached,
       total: this.total,
+      rawTotal: this.rawTotal,
       costUsd: Math.round(this.costUsd * 1e6) / 1e6,
       cap: this.limits.runTokenCap,
       fraction: Math.round((this.total / this.limits.runTokenCap) * 1000) / 1000,
       warned: this.warned,
       exhausted: this.exhaustedRun,
-      actors: Object.fromEntries([...this.actors.entries()].map(([k, v]) => [k, { total: v.in + v.out, costUsd: Math.round(v.cost * 1e6) / 1e6 }])),
+      actors: Object.fromEntries([...this.actors.entries()].map(([k, v]) => [k, { total: v.in - v.cached + v.out, rawTotal: v.in + v.out, costUsd: Math.round(v.cost * 1e6) / 1e6 }])),
     };
   }
 }
 
 /** Rough per-call token shapes measured on fixture runs (prompt sizes after trimming). */
 const SHAPE = {
-  shopperPrompt: 1_500,
-  shopperOut: 110,
+  /** Usage of one shopper call summed over its tool steps (measured 15-18k on live runs, 8 Nov 2026). */
+  shopperPrompt: 16_000,
+  shopperOut: 700,
   /** Shoppers usually say DONE before the turn cap. */
-  shopperTurnShare: 0.6,
-  merchantPrompt: 2_400,
-  merchantOut: 180,
-  /** Inbox items are batched, so a merchant call covers more than one order. */
-  merchantTurnsPerOrder: 1.2,
+  shopperTurnShare: 0.5,
+  merchantPrompt: 11_000,
+  merchantOut: 500,
+  /** Inbox items are batched, so a merchant call covers more than one order (measured 4-6 calls per 5-10 orders). */
+  merchantTurnsPerOrder: 0.6,
+  merchantCacheShare: 0.6,
   analystPrompt: 2_000,
   analystOut: 300,
-  analystTurns: 6,
-  shopperCacheShare: 0.55,
+  analystTurns: 3,
+  shopperCacheShare: 0.85,
 };
 
 export interface Estimate {
+  /** Billable tokens (uncached input + output), the number the run cap is compared with. */
   tokens: number;
+  /** Every token through a model, cached prefix reads included. */
+  rawTokens: number;
   usd: number;
   breakdown: { shoppers: { tokens: number; usd: number }; merchant: { tokens: number; usd: number }; analyst: { tokens: number; usd: number } };
   overCap: boolean;
@@ -175,24 +196,31 @@ export interface Estimate {
 export function estimateRun(scenario: Scenario, opts: { models?: Partial<typeof DEFAULT_MODELS>; tokenCap?: number; scripted?: boolean } = {}): Estimate {
   const models = { ...DEFAULT_MODELS, ...Object.fromEntries(Object.entries(opts.models ?? {}).filter(([, v]) => v)) } as typeof DEFAULT_MODELS;
   const cap = opts.tokenCap ?? scenario.tokenCap;
-  if (opts.scripted) return { tokens: 0, usd: 0, breakdown: { shoppers: { tokens: 0, usd: 0 }, merchant: { tokens: 0, usd: 0 }, analyst: { tokens: 0, usd: 0 } }, overCap: false, models };
+  if (opts.scripted) return { tokens: 0, rawTokens: 0, usd: 0, breakdown: { shoppers: { tokens: 0, usd: 0 }, merchant: { tokens: 0, usd: 0 }, analyst: { tokens: 0, usd: 0 } }, overCap: false, models };
   const shopperCalls = scenario.shoppers * Math.max(2, Math.ceil(scenario.shopperTurns * SHAPE.shopperTurnShare));
   const shopperIn = shopperCalls * SHAPE.shopperPrompt;
   const shopperOut = shopperCalls * SHAPE.shopperOut;
-  const shoppersUsd = costFor(models.shopper, { inputTokens: shopperIn, outputTokens: shopperOut, cachedTokens: Math.round(shopperIn * SHAPE.shopperCacheShare) });
-  const merchantCalls = Math.round(scenario.shoppers * SHAPE.merchantTurnsPerOrder) + scenario.chaos.length * 2;
+  const shopperCached = Math.round(shopperIn * SHAPE.shopperCacheShare);
+  const shoppersUsd = costFor(models.shopper, { inputTokens: shopperIn, outputTokens: shopperOut, cachedTokens: shopperCached });
+  const merchantCalls = Math.max(2, Math.round(scenario.shoppers * SHAPE.merchantTurnsPerOrder) + scenario.chaos.length);
   const merchantIn = merchantCalls * SHAPE.merchantPrompt;
   const merchantOut = merchantCalls * SHAPE.merchantOut;
-  const merchantUsd = costFor(models.merchant, { inputTokens: merchantIn, outputTokens: merchantOut, cachedTokens: Math.round(merchantIn * 0.3) });
+  const merchantCached = Math.round(merchantIn * SHAPE.merchantCacheShare);
+  const merchantUsd = costFor(models.merchant, { inputTokens: merchantIn, outputTokens: merchantOut, cachedTokens: merchantCached });
   const analystIn = SHAPE.analystTurns * SHAPE.analystPrompt;
   const analystOut = SHAPE.analystTurns * SHAPE.analystOut;
   const analystUsd = costFor(models.analyst, { inputTokens: analystIn, outputTokens: analystOut });
-  const tokens = shopperIn + shopperOut + merchantIn + merchantOut + analystIn + analystOut;
+  const shopperTokens = shopperIn - shopperCached + shopperOut;
+  const merchantTokens = merchantIn - merchantCached + merchantOut;
+  const analystTokens = analystIn + analystOut;
+  const tokens = shopperTokens + merchantTokens + analystTokens;
+  const rawTokens = shopperIn + shopperOut + merchantIn + merchantOut + analystIn + analystOut;
   const usd = shoppersUsd + merchantUsd + analystUsd;
   return {
     tokens,
+    rawTokens,
     usd: Math.round(usd * 10000) / 10000,
-    breakdown: { shoppers: { tokens: shopperIn + shopperOut, usd: r4(shoppersUsd) }, merchant: { tokens: merchantIn + merchantOut, usd: r4(merchantUsd) }, analyst: { tokens: analystIn + analystOut, usd: r4(analystUsd) } },
+    breakdown: { shoppers: { tokens: shopperTokens, usd: r4(shoppersUsd) }, merchant: { tokens: merchantTokens, usd: r4(merchantUsd) }, analyst: { tokens: analystTokens, usd: r4(analystUsd) } },
     overCap: tokens > cap,
     models,
   };

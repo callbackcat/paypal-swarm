@@ -5,6 +5,7 @@
 export class SimClock {
   private pausedAt: number | null = null;
   private pausedTotal = 0;
+  private jumped = 0;
 
   constructor(
     public readonly startedAt: number = Date.now(),
@@ -14,7 +15,12 @@ export class SimClock {
   /** Simulated minutes elapsed since the run started, excluding paused time. */
   now(real: number = Date.now()): number {
     const effective = (this.pausedAt ?? real) - this.startedAt - this.pausedTotal;
-    return Math.max(0, Math.floor((effective / 60_000) * this.factor));
+    return Math.max(0, Math.floor((effective / 60_000) * this.factor) + this.jumped);
+  }
+
+  /** Move the simulated clock forward at once, for the settle phase after the shoppers are done. */
+  jump(simMinutes: number) {
+    this.jumped += Math.max(0, simMinutes);
   }
 
   pause(real: number = Date.now()) {

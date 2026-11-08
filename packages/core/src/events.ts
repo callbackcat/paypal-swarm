@@ -8,6 +8,7 @@ export const EVENT_TYPES = [
   "run.paused",
   "run.resumed",
   "run.finished",
+  "run.settling",
   "agent.turn",
   "tool.call",
   "tool.result",

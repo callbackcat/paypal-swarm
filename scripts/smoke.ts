@@ -38,7 +38,7 @@ async function main() {
     if (await db.ping()) store = db;
     else console.warn("DATABASE_URL unreachable; using memory store");
   }
-  const manager = new RunManager(store, new Bus(), readEnv, fast ? { pacing: { stepMs: 40, chaosTickMs: 60, analystIntervalMs: 400, drainMs: 2500 }, clockFactor: 3000, mockLatencyMs: 5 } : {});
+  const manager = new RunManager(store, new Bus(), readEnv, fast ? { pacing: { stepMs: 40, chaosTickMs: 60, analystIntervalMs: 400, drainMs: 2500, settleStepMs: 80 }, clockFactor: 3000, mockLatencyMs: 5 } : {});
   const config = RunConfigSchema.parse({ scenario, merchantProfile: profile, shoppers, llm, paypal, name: `smoke ${new Date().toISOString()}` });
   const est = manager.estimate(config);
   console.log(`[smoke] ${scenario} · ${shoppers} shoppers · ${profile} · modes ${JSON.stringify(est.modes)} · estimate ${est.estimate.tokens} tokens ≈ $${est.estimate.usd.toFixed(3)} (cap ${est.tokenCap})`);

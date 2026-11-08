@@ -21,6 +21,20 @@ const PROFILES: Array<{ id: "baseline" | "hardened"; label: string; blurb: strin
   { id: "baseline", label: "Baseline merchant", blurb: "Captures on every approval, treats HTTP 200 as paid, ships only when asked and ignores disputes until prompted. The way most first agents are wired." },
   { id: "hardened", label: "Hardened merchant", blurb: "Per-order capture lock with PayPal-Request-Id, reads the capture status, auto-tracking, refund clamping, dispute SLA and human approval above the threshold." },
 ];
+/** OpenRouter ids with USD per million input/output tokens, as listed on 8 Nov 2026. "" keeps the server's SWARM_MODEL_* defaults. */
+const MODEL_ITEMS = [
+  { value: "default", label: "Server default" },
+  { value: "anthropic/claude-haiku-5.5", label: "Claude Haiku 5.5 · $0.10 / $0.50" },
+  { value: "anthropic/claude-sonnet-5.5", label: "Claude Sonnet 5.5 · $2 / $10" },
+  { value: "anthropic/claude-opus-5.5", label: "Claude Opus 5.5 · $4 / $20" },
+  { value: "openai/gpt-5.5", label: "GPT-5.5 · $5 / $30" },
+  { value: "openai/gpt-5.1", label: "GPT-5.1 · $1.25 / $10" },
+  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite · $0.10 / $0.40" },
+  { value: "openai/gpt-6-luna", label: "GPT-6 Luna · $0.10 / $0.50" },
+  { value: "deepseek/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash · $0.05 / $0.57" },
+  { value: "openai/gpt-oss-120b", label: "gpt-oss-120b · $0.02 / $0.07" },
+  { value: "qwen/qwen3.7-flash", label: "Qwen 3.7 Flash · $0.03 / $0.13" },
+];
 const LLM_ITEMS = [
   { value: "auto", label: "Auto: live if a key exists" },
   { value: "scripted", label: "Scripted: zero tokens" },
@@ -45,6 +59,7 @@ export default function SetupPage() {
   const [tokenCap, setTokenCap] = useState<string>("");
   const [threshold, setThreshold] = useState<string>("50");
   const [llm, setLlm] = useState<"auto" | "scripted" | "live">("auto");
+  const [model, setModel] = useState("default");
   const [paypal, setPaypal] = useState<"auto" | "mock" | "sandbox">("auto");
   const [byo, setByo] = useState(false);
   const [orKey, setOrKey] = useState("");
@@ -78,12 +93,13 @@ export default function SetupPage() {
   const current = data?.scenarios.find((s) => s.id === scenario);
   const config = useMemo<RunConfigInput>(() => {
     const cfg: RunConfigInput = { scenario, merchantProfile: profile, llm, paypal, approvalThresholdUsd: Number(threshold) || 50 };
+    if (model !== "default") cfg.models = { shopper: model, merchant: model, analyst: model };
     if (shoppers) cfg.shoppers = Number(shoppers);
     if (tokenCap) cfg.tokenCap = Number(tokenCap);
     if (byo && orKey.trim()) cfg.openrouterApiKey = orKey.trim();
     if (byo && ppId.trim() && ppSecret.trim()) cfg.credentials = { clientId: ppId.trim(), clientSecret: ppSecret.trim() };
     return cfg;
-  }, [scenario, profile, llm, paypal, threshold, shoppers, tokenCap, byo, orKey, ppId, ppSecret]);
+  }, [scenario, profile, llm, paypal, model, threshold, shoppers, tokenCap, byo, orKey, ppId, ppSecret]);
 
   useEffect(() => {
     if (!current || current.status !== "ready") return;
@@ -228,6 +244,24 @@ export default function SetupPage() {
                     </SelectContent>
                   </Select>
                 </Field>
+                {llm !== "scripted" && (
+                  <Field>
+                    <FieldLabel>Model</FieldLabel>
+                    <Select items={MODEL_ITEMS} value={model} onValueChange={(v) => v && setModel(v)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pick the model for every agent" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MODEL_ITEMS.map((i) => (
+                          <SelectItem key={i.value} value={i.value}>
+                            {i.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldDescription>One OpenRouter model for shoppers, merchant and analyst. Prices are USD per million tokens in and out.</FieldDescription>
+                  </Field>
+                )}
                 <Field>
                   <FieldLabel>PayPal</FieldLabel>
                   <Select items={PAYPAL_ITEMS} value={paypal} onValueChange={(v) => v && setPaypal(v as typeof paypal)}>

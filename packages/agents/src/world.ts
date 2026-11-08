@@ -224,8 +224,10 @@ export interface Pacing {
   analystIntervalMs: number;
   /** Real ms to let the merchant finish after the last shopper. */
   drainMs: number;
+  /** Real ms between simulated-hour jumps in the settle phase. */
+  settleStepMs: number;
 }
-export const DEFAULT_PACING: Pacing = { stepMs: 700, chaosTickMs: 1000, analystIntervalMs: 60_000, drainMs: 15_000 };
+export const DEFAULT_PACING: Pacing = { stepMs: 700, chaosTickMs: 1000, analystIntervalMs: 60_000, drainMs: 15_000, settleStepMs: 1500 };
 
 export interface WorldOptions {
   runId: string;

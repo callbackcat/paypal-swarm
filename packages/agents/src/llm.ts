@@ -9,12 +9,23 @@ export interface Price {
   cacheRead: number;
   cacheWrite: number;
 }
+/** OpenRouter list prices, USD per million tokens, as read on 8 Nov 2026. Unknown models fall back to Sonnet so the estimate errs high. */
 export const PRICES: Record<string, Price> = {
   "anthropic/claude-haiku-5.5": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 },
   "anthropic/claude-sonnet-5.5": { input: 2, output: 10, cacheRead: 0.1, cacheWrite: 2.5 },
-  "anthropic/claude-opus-5.5": { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
-  "openai/gpt-5.5-mini": { input: 0.25, output: 2, cacheRead: 0.025, cacheWrite: 0 },
-  "google/gemini-3-flash": { input: 0.15, output: 0.6, cacheRead: 0.0375, cacheWrite: 0 },
+  "anthropic/claude-opus-5.5": { input: 4, output: 20, cacheRead: 0.2, cacheWrite: 5 },
+  "openai/gpt-5.5": { input: 5, output: 30, cacheRead: 0.5, cacheWrite: 0 },
+  "openai/gpt-5.1": { input: 1.25, output: 10, cacheRead: 0.125, cacheWrite: 0 },
+  "google/gemini-2.5-flash-lite": { input: 0.1, output: 0.4, cacheRead: 0.01, cacheWrite: 0 },
+  "google/gemini-3.1-flash-lite": { input: 0.25, output: 1.5, cacheRead: 0.025, cacheWrite: 0 },
+  "openai/gpt-6-luna": { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0 },
+  "openai/gpt-5-nano": { input: 0.05, output: 0.4, cacheRead: 0.005, cacheWrite: 0 },
+  "openai/gpt-5-mini": { input: 0.25, output: 2, cacheRead: 0.025, cacheWrite: 0 },
+  "openai/gpt-oss-120b": { input: 0.019, output: 0.071, cacheRead: 0.017, cacheWrite: 0 },
+  "deepseek/deepseek-v4.1-flash": { input: 0.051, output: 0.567, cacheRead: 0.018, cacheWrite: 0 },
+  "qwen/qwen3.7-flash": { input: 0.03, output: 0.13, cacheRead: 0.006, cacheWrite: 0 },
+  "z-ai/glm-5.3-flash": { input: 0.034, output: 0.083, cacheRead: 0.03, cacheWrite: 0 },
+  "meta-llama/llama-4-scout": { input: 0.1, output: 0.3, cacheRead: 0.1, cacheWrite: 0 },
 };
 /** Unknown models are priced like Sonnet so estimates err on the expensive side. */
 export const FALLBACK_PRICE: Price = PRICES["anthropic/claude-sonnet-5.5"]!;
