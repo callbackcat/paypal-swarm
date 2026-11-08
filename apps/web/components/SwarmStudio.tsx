@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtSim, subscribe, type Finding, type Report, type RunStatus, type SwarmEvent } from "@/lib/api";
 import { applyEvent, emptyArena, reduceAll, summarize, type ArenaState, type OrderRow } from "@/lib/arena";
 import { swarmAdapter } from "@/lib/studioAdapter";
+import { quietLicenceBanner } from "@/lib/quietLicenceBanner";
 import { ErrorAlert } from "@/components/ui";
 
 type Row = Record<string, string | number | boolean | null>;
@@ -193,6 +194,8 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
   if (error) return <ErrorAlert error={error} />;
   if (!data) return <p className="type-body-sm text-text-2">Loading run data.</p>;
   const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY || undefined;
+  // Installed during render so it is in place before AG Studio mounts and prints its banner.
+  if (!licenseKey) quietLicenceBanner();
 
   return (
     <div className="flex flex-col gap-3">
@@ -203,7 +206,7 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
         </span>
         <span>
           studio turns {usage.turns}, {usage.tokens} tokens, ${usage.costUsd.toFixed(4)}
-          {!licenseKey ? ", trial (set NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY)" : ""}
+          {!licenseKey ? "; AG Studio runs on its trial licence (watermark) until NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY is set" : ""}
         </span>
       </div>
       <div className="ag-studio-host frame overflow-hidden">
