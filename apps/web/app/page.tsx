@@ -2,8 +2,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { api, fmtTokens, fmtUsd, type Estimate, type Modes, type RunConfigInput, type RunListItem, type ScenariosResponse } from "@/lib/api";
+import { api, fmtTokens, fmtUsd, type Estimate, type Modes, type PlanResult, type RunConfigInput, type RunListItem, type ScenariosResponse } from "@/lib/api";
 import { ErrorAlert, ModeTags, RunStatus, ScenarioListSkeleton, ValueSkeleton } from "@/components/ui";
+import { SwarmHero } from "@/components/SwarmHero";
+import { SwarmLauncher } from "@/components/SwarmLauncher";
 import { ArrowUpRight, Icon } from "@/components/sodium/icon";
 import { Button } from "@/components/sodium/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
@@ -69,6 +71,8 @@ export default function SetupPage() {
   const [estimating, setEstimating] = useState(false);
   const [starting, setStarting] = useState(false);
   const [guardrails, setGuardrails] = useState(false);
+  const [brief, setBrief] = useState("");
+  const [runName, setRunName] = useState("");
 
   useEffect(() => {
     api
@@ -96,10 +100,12 @@ export default function SetupPage() {
     if (model !== "default") cfg.models = { shopper: model, merchant: model, analyst: model };
     if (shoppers) cfg.shoppers = Number(shoppers);
     if (tokenCap) cfg.tokenCap = Number(tokenCap);
+    if (brief.trim()) cfg.brief = brief.trim();
+    if (runName.trim()) cfg.name = runName.trim();
     if (byo && orKey.trim()) cfg.openrouterApiKey = orKey.trim();
     if (byo && ppId.trim() && ppSecret.trim()) cfg.credentials = { clientId: ppId.trim(), clientSecret: ppSecret.trim() };
     return cfg;
-  }, [scenario, profile, llm, paypal, model, threshold, shoppers, tokenCap, byo, orKey, ppId, ppSecret]);
+  }, [scenario, profile, llm, paypal, model, threshold, shoppers, tokenCap, byo, orKey, ppId, ppSecret, brief, runName]);
 
   useEffect(() => {
     if (!current || current.status !== "ready") return;
@@ -118,11 +124,16 @@ export default function SetupPage() {
     };
   }, [config, current]);
 
-  async function start() {
+  /** Release what the form holds. With `both`, the other merchant profile follows as a second run for a side-by-side. */
+  async function start(both = false) {
     setStarting(true);
     setError(null);
     try {
       const run = await api.createRun(config);
+      if (both) {
+        const other = config.merchantProfile === "hardened" ? "baseline" : "hardened";
+        await api.createRun({ ...config, merchantProfile: other, name: `${config.name ?? current?.name ?? scenario} ${other}` });
+      }
       router.push(`/runs/${run.id}`);
     } catch (e) {
       setError(e);
@@ -130,20 +141,68 @@ export default function SetupPage() {
     }
   }
 
+  /** The launcher read a plan: put it into the form so the estimate and every field follow it. */
+  function applyPlan(r: PlanResult) {
+    const { plan } = r;
+    if (data?.scenarios.some((s) => s.id === plan.scenario && s.status === "ready")) setScenario(plan.scenario);
+    setProfile(plan.merchantProfile);
+    setShoppers(plan.shoppers ? String(plan.shoppers) : "");
+    setModel(plan.model && MODEL_ITEMS.some((m) => m.value === plan.model) ? plan.model : "default");
+    setBrief(plan.brief ?? "");
+    setRunName(plan.name);
+  }
+
   const est = estimate?.estimate;
   const overCap = !!est?.overCap;
   const ready = (data?.scenarios ?? []).filter((s) => s.status === "ready");
   const canStart = !starting && !overCap && !!current && current.status === "ready";
+  const blocker = starting ? null : overCap ? "over the token cap: lower the shoppers or pick a cheaper model" : !current ? (error ? "the api is not reachable" : "loading scenarios") : current.status !== "ready" ? "this scenario is not runnable yet" : null;
+  const estimateLine = !current ? null : estimating || !est ? null : est.tokens === 0 ? "scripted agents, zero tokens" : `${fmtTokens(est.tokens)} tokens, about ${fmtUsd(est.usd, 3)}`;
 
   return (
     <>
-      <section className="flex max-w-measure flex-col gap-3">
-        <h1 className="type-title">Release a swarm at your checkout</h1>
-        <p className="type-body text-text-2">
-          Swarm points LLM shoppers, a merchant agent and a chaos agent at a PayPal sandbox store, watches what breaks and scores how ready the store is for agentic commerce. Pick a scenario, check the estimate, release the swarm. Nothing touches a real PayPal account unless you give it sandbox credentials.
-        </p>
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:items-center">
+        <div className="flex max-w-measure flex-col gap-3 lg:col-span-2">
+          <h1 className="type-title">Release a swarm at your checkout</h1>
+          <p className="type-body text-text-2">
+            Swarm points LLM shoppers, a merchant agent and a chaos agent at a PayPal sandbox store, watches what breaks and scores how ready the store is for agentic commerce. Say what to try in one sentence, confirm the plan and the cost, then watch the Arena. Nothing touches a real PayPal account unless you give it sandbox credentials.
+          </p>
+        </div>
+        <div className="min-w-0 lg:col-span-3">
+          <SwarmHero scenarioLabel={current?.id ?? "black-friday"} />
+        </div>
       </section>
       <ErrorAlert error={error} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <SwarmLauncher scenarios={data?.scenarios ?? null} onPlan={applyPlan} onRelease={(both) => void start(both)} estimateLine={estimateLine} starting={starting} blocker={blocker} formId="fine-tune" />
+        </div>
+        <aside className="flex flex-col gap-4">
+          <h2 className="type-heading-sm">How it works</h2>
+          <ol className="flex flex-col gap-4">
+            {[
+              ["Describe", "One sentence: who the shoppers are, what to break, which merchant. A preset works too."],
+              ["Confirm", "The plan shows the scenario, the shoppers, the model and the estimated cost. Hard caps stop a runaway run."],
+              ["Watch, then read", "The Arena streams every agent turn and PayPal call live. The Report scores it and names the fix; the Studio is the deep dive."],
+            ].map(([title, body], i) => (
+              <li key={title} className="flex gap-3">
+                <span className="type-label text-accent-text">{String(i + 1).padStart(2, "0")}</span>
+                <span className="flex flex-col gap-1">
+                  <span className="type-body text-text-1">{title}</span>
+                  <span className="type-body-sm text-text-2">{body}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="type-caption text-text-3">Why: an agent that shops for a human will hit your checkout the way these do. Swarm finds the gaps before a real one does, on a sandbox, for cents.</p>
+        </aside>
+      </div>
+
+      <section id="fine-tune" className="flex max-w-measure flex-col gap-2 scroll-mt-6">
+        <h2 className="type-heading">Fine-tune</h2>
+        <p className="type-body-sm text-text-2">Everything the plan set is below and editable. The estimate on the right follows every change.</p>
+      </section>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="flex flex-col gap-6 lg:col-span-2">
@@ -223,6 +282,16 @@ export default function SetupPage() {
                   <FieldLabel>Run token cap</FieldLabel>
                   <Input mono inputMode="numeric" placeholder={String(current?.tokenCap ?? "")} value={tokenCap} onChange={(e) => setTokenCap(e.target.value.replace(/\D/g, ""))} />
                   <FieldDescription>Swarm refuses to start over the cap.</FieldDescription>
+                </Field>
+                <Field className="sm:col-span-2 lg:col-span-3">
+                  <FieldLabel>Shopper brief</FieldLabel>
+                  <Input placeholder="Who the shoppers are this run and what to try to break" value={brief} onChange={(e) => setBrief(e.target.value)} maxLength={600} />
+                  <FieldDescription>Handed to every shopper in character. The launcher fills it from your sentence.</FieldDescription>
+                </Field>
+                <Field>
+                  <FieldLabel>Run name</FieldLabel>
+                  <Input placeholder={current?.name ?? ""} value={runName} onChange={(e) => setRunName(e.target.value)} maxLength={60} />
+                  <FieldDescription>Blank names it after the scenario.</FieldDescription>
                 </Field>
                 <Field>
                   <FieldLabel>Approval above</FieldLabel>
@@ -395,7 +464,7 @@ export default function SetupPage() {
             </FrameBody>
             <FrameFooter>
               <FrameMeta>{profile} merchant</FrameMeta>
-              <Button size="sm" pending={starting} pendingLabel="Starting" disabled={!canStart} onClick={start}>
+              <Button size="sm" pending={starting} pendingLabel="Starting" disabled={!canStart} onClick={() => void start()}>
                 Release the swarm
               </Button>
             </FrameFooter>

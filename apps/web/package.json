@@ -17,6 +17,7 @@
     "ag-grid-react": "~36.3.0",
     "ag-studio": "3.1.0",
     "ag-studio-react": "3.1.0",
+    "ascii-magic-art": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.52.0",

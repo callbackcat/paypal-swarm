@@ -42,6 +42,25 @@ export interface RunConfigInput {
   llmCache?: boolean;
   credentials?: { clientId: string; clientSecret: string; merchantId?: string };
   openrouterApiKey?: string;
+  /** Free text handed to every shopper: who they are this run and what to try to break. */
+  brief?: string;
+}
+/** What POST /ai/plan-run makes of one sentence: a strict plan, the config it maps to, and how it was produced. */
+export interface PlanResult {
+  plan: {
+    scenario: string;
+    merchantProfile: "baseline" | "hardened";
+    bothProfiles: boolean;
+    shoppers: number | null;
+    model: string | null;
+    brief: string | null;
+    name: string;
+    reading: string;
+  };
+  config: Pick<RunConfigInput, "scenario" | "merchantProfile" | "name" | "shoppers" | "brief" | "models">;
+  source: "llm" | "heuristic";
+  usage: { costUsd: number; inputTokens: number; outputTokens: number };
+  model?: string;
 }
 export interface BudgetSnapshot {
   tokensIn: number;
@@ -140,6 +159,7 @@ export const api = {
   scenarios: () => j<ScenariosResponse>("/scenarios"),
   estimate: (cfg: RunConfigInput) => post<{ scenario: string; shoppers: number; tokenCap: number; modes: Modes; estimate: Estimate }>("/runs/estimate", cfg),
   createRun: (cfg: RunConfigInput) => post<RunStatus & { modes: Modes; estimate: Estimate }>("/runs", cfg),
+  planRun: (text: string) => post<PlanResult>("/ai/plan-run", { text }),
   listRuns: () => j<{ runs: RunListItem[] }>("/runs"),
   getRun: (id: string) => j<RunStatus>(`/runs/${id}`),
   events: (id: string, since = 0, type?: string, limit = 5000) => j<{ events: SwarmEvent[]; next: number }>(`/runs/${id}/events.json?since=${since}&limit=${limit}${type ? `&type=${encodeURIComponent(type)}` : ""}`),

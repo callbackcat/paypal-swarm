@@ -125,6 +125,9 @@ importers:
       ag-studio-react:
         specifier: 3.1.0
         version: 3.1.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      ascii-magic-art:
+        specifier: ^1.1.0
+        version: 1.1.0
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
