@@ -10,6 +10,7 @@ import type { Env } from "./env";
 import { HttpError, RunManager } from "./runs";
 import type { Store } from "./store";
 import { studioTurn, StudioTurnSchema } from "./studio";
+import { planRun, PlanRequestSchema } from "./plan";
 import { handleWebhook } from "./webhooks";
 
 export interface AppDeps {
@@ -27,7 +28,7 @@ const json = (schema: z.ZodTypeAny, description: string) => ({ description, cont
 export function createApp(deps: AppDeps) {
   const { store, bus, manager, env } = deps;
   const app = new OpenAPIHono({ defaultHook: (result, c) => (result.success ? undefined : c.json({ error: result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }, 400)) });
-  app.use("*", cors({ origin: env().corsOrigin === "*" ? "*" : env().corsOrigin.split(","), allowHeaders: ["Content-Type", "Authorization", "Last-Event-ID"], exposeHeaders: ["Content-Type"] }));
+  app.use("*", cors({ origin: env().corsOrigin === "*" ? "*" : env().corsOrigin.split(","), allowHeaders: ["Content-Type", "Authorization", "Last-Event-ID", "X-OpenRouter-Key"], exposeHeaders: ["Content-Type"] }));
   app.onError((e, c) => {
     if (e instanceof HttpError) return c.json({ error: e.message }, e.status as 400);
     console.error(e);
@@ -186,6 +187,15 @@ export function createApp(deps: AppDeps) {
     }
     const result = await handleWebhook({ store, bus, manager }, { body, verified, source: "http" });
     return c.json({ ok: true, verified, ...result }, 200);
+  });
+
+  // --- Launcher: one sentence to a run config -----------------------------------------------------
+  app.openAPIRegistry.registerPath({ method: "post", path: "/ai/plan-run", tags: ["runs"], summary: "Turn one sentence into a run config to confirm (LLM with a strict schema, keyword parser without a key)", request: { body: { content: { "application/json": { schema: PlanRequestSchema } } } }, responses: { 200: { description: "{ plan, config, source: llm | heuristic, usage }" } } });
+  app.post("/ai/plan-run", async (c) => {
+    const parsed = PlanRequestSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
+    const apiKey = c.req.header("x-openrouter-key") || undefined;
+    return c.json(await planRun(parsed.data, { env: env(), apiKey }));
   });
 
   // --- AG Studio analyst turn -------------------------------------------------------------------

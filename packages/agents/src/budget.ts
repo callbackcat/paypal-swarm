@@ -23,7 +23,8 @@ export const DEFAULT_LIMITS: BudgetLimits = {
   merchantTokenCap: 60_000,
   analystTokenCap: 20_000,
   shopperMaxOutput: 400,
-  merchantMaxOutput: 800,
+  /** A hardened merchant batch is capture + tracking + reply per order, each a tool call; 800 cut replies mid call. */
+  merchantMaxOutput: 2_000,
   analystMaxOutput: 1_500,
   shopperMaxSteps: 8,
   merchantMaxSteps: 12,

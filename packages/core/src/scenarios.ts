@@ -44,6 +44,8 @@ export const ScenarioSchema = z.object({
   tokenCap: z.number().int().positive().default(400_000),
   /** Measured on fixture runs; used by the Setup estimate before anything is spent. */
   estimate: z.object({ tokens: z.number().int(), usd: z.number() }),
+  /** Free-text brief from the launcher: who the shoppers are and what to try to break. Shoppers read it; the merchant does not. */
+  brief: z.string().max(600).optional(),
 });
 export type Scenario = z.infer<typeof ScenarioSchema>;
 
@@ -122,6 +124,7 @@ export const RunConfigSchema = z.object({
   shoppers: z.number().int().min(1).max(60).optional(),
   tokenCap: z.number().int().min(5_000).max(5_000_000).optional(),
   personaSeed: z.number().int().optional(),
+  brief: z.string().trim().max(600).optional(),
   models: z.object({ shopper: z.string().optional(), merchant: z.string().optional(), analyst: z.string().optional() }).default({}),
   approvalThresholdUsd: z.number().nonnegative().default(50),
   approvalTimeoutSec: z.number().int().positive().default(120),
@@ -139,5 +142,5 @@ export function resolveScenario(cfg: RunConfig): Scenario {
   const base = scenarioById(cfg.scenario);
   if (!base) throw new Error(`unknown scenario ${cfg.scenario}`);
   if (base.status !== "ready") throw new Error(`scenario ${cfg.scenario} is not available yet`);
-  return { ...base, shoppers: cfg.shoppers ?? base.shoppers, tokenCap: cfg.tokenCap ?? base.tokenCap, personaSeed: cfg.personaSeed ?? base.personaSeed };
+  return { ...base, shoppers: cfg.shoppers ?? base.shoppers, tokenCap: cfg.tokenCap ?? base.tokenCap, personaSeed: cfg.personaSeed ?? base.personaSeed, brief: cfg.brief ?? base.brief };
 }

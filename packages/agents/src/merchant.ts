@@ -2,6 +2,7 @@ import { ALLOWLISTS, summariseCapture, type ToolOutcome } from "@swarm/paypal";
 import { generateText, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
 import { normaliseUsage, ZERO_USAGE } from "./llm";
+import { unansweredToolCalls, windowHistory } from "./history";
 import { byName, fail, logged, ok, platformTool, toToolSet, type AgentTool } from "./tools";
 import type { MerchantInboxItem, OrderRecord, World } from "./world";
 
@@ -273,20 +274,28 @@ export async function runMerchant(world: World): Promise<void> {
         const model = world.o.llm.model(world.o.models.merchant);
         const cacheHitsBefore = world.o.cache?.stats.hits ?? 0;
         history.push({ role: "user", content: batch.map((b) => describe(b, world)).join("\n") });
-        const result = await generateText({
-          model,
-          system: world.hardened ? HARDENED_SYSTEM : BASELINE_SYSTEM,
-          messages: history.slice(-8),
-          tools: toolSet,
-          maxOutputTokens: guard.maxOutputFor("merchant"),
-          stopWhen: stepCountIs(guard.maxStepsFor("merchant")),
-          abortSignal: world.o.control.abort.signal,
-          experimental_telemetry: { isEnabled: true, functionId: "merchant", metadata: { runId: world.runId, profile: world.merchantProfile } },
-        });
-        const usage = normaliseUsage(world.o.models.merchant, result.totalUsage, result.providerMetadata);
-        guard.record(MERCHANT, usage);
-        await world.emit("agent.turn", MERCHANT, "merchant", { actor: MERCHANT, model: world.o.models.merchant, turn: turn++, steps: result.steps.length, finishReason: result.finishReason, text: result.text.slice(0, 400), toolCalls: result.toolCalls.map((c) => c.toolName), batch: batch.length, usage, costUsd: usage.costUsd, cached: (world.o.cache?.stats.hits ?? 0) > cacheHitsBefore });
-        history = [...history, ...result.response.messages].slice(-12);
+        // A reply cut off by the output limit keeps its tool calls but never runs them. Repair the history and
+        // give the merchant up to two more goes at the same batch before moving on.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          if (attempt > 0 && !guard.check(MERCHANT, "merchant").ok) break;
+          const result = await generateText({
+            model,
+            system: world.hardened ? HARDENED_SYSTEM : BASELINE_SYSTEM,
+            messages: windowHistory(history, 10),
+            tools: toolSet,
+            maxOutputTokens: guard.maxOutputFor("merchant"),
+            stopWhen: stepCountIs(guard.maxStepsFor("merchant")),
+            abortSignal: world.o.control.abort.signal,
+            experimental_telemetry: { isEnabled: true, functionId: "merchant", metadata: { runId: world.runId, profile: world.merchantProfile } },
+          });
+          const usage = normaliseUsage(world.o.models.merchant, result.totalUsage, result.providerMetadata);
+          guard.record(MERCHANT, usage);
+          const unanswered = unansweredToolCalls(result.response.messages);
+          await world.emit("agent.turn", MERCHANT, "merchant", { actor: MERCHANT, model: world.o.models.merchant, turn: turn++, steps: result.steps.length, finishReason: result.finishReason, text: result.text.slice(0, 400), toolCalls: result.toolCalls.map((c) => c.toolName), batch: batch.length, usage, costUsd: usage.costUsd, cached: (world.o.cache?.stats.hits ?? 0) > cacheHitsBefore, cutOff: unanswered.length > 0 ? unanswered.map((c) => c.toolName) : undefined, attempt });
+          history = [...history, ...result.response.messages].slice(-14);
+          if (result.finishReason !== "length" || unanswered.length === 0) break;
+          history.push({ role: "user", content: `Your reply was cut off by the output limit, so these tool calls did not run: ${unanswered.map((c) => c.toolName).join(", ")}. Make them again now, one short sentence of prose at most.` });
+        }
       } else {
         for (const item of batch) await scriptedMerchantStep(world, named, item, turn++);
       }

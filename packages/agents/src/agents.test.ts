@@ -5,6 +5,7 @@ import { BudgetGuard, estimateRun } from "./budget";
 import { cacheKey, cacheMiddleware, MemoryCacheStore } from "./cache";
 import { startRun, type RunDeps } from "./executor";
 import { costFor, ZERO_USAGE } from "./llm";
+import { repairToolHistory, unansweredToolCalls, windowHistory } from "./history";
 import { MemoryApprovalGate, MemoryEventSink } from "./world";
 
 const fastDeps = (over: Partial<RunDeps> = {}): RunDeps => ({
@@ -46,6 +47,39 @@ describe("budget guard", () => {
     expect(estimateRun(scenarioById("quiet-tuesday")!, { scripted: true }).tokens).toBe(0);
     expect(costFor("anthropic/claude-haiku-5.5", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(0.1, 5);
     expect(costFor("anthropic/claude-haiku-5.5", { inputTokens: 1_000_000, outputTokens: 0, cachedTokens: 1_000_000 })).toBeCloseTo(0.01, 5);
+  });
+});
+
+describe("tool history repair", () => {
+  const call = (id: string) => ({ type: "tool-call" as const, toolCallId: id, toolName: "pay_order", input: { id } });
+  const result = (id: string) => ({ type: "tool-result" as const, toolCallId: id, toolName: "pay_order", output: { type: "json" as const, value: { ok: true } } });
+  it("fills in an error result for tool calls a cut-off reply never ran", () => {
+    const history = [
+      { role: "user" as const, content: "capture" },
+      { role: "assistant" as const, content: [call("a"), call("b")] },
+      { role: "tool" as const, content: [result("a")] },
+    ];
+    expect(unansweredToolCalls(history).map((c) => c.toolCallId)).toEqual(["b"]);
+    const fixed = repairToolHistory(history);
+    expect(fixed).toHaveLength(3);
+    const tool = fixed[2]!;
+    expect(tool.role).toBe("tool");
+    expect((tool.content as { toolCallId: string }[]).map((p) => p.toolCallId)).toEqual(["a", "b"]);
+    expect(unansweredToolCalls(fixed)).toHaveLength(0);
+    const tail = repairToolHistory([{ role: "assistant", content: [call("c")] }]);
+    expect(tail).toHaveLength(2);
+  });
+  it("never opens a window on an orphan tool message", () => {
+    const history = [
+      { role: "user" as const, content: "one" },
+      { role: "assistant" as const, content: [call("a")] },
+      { role: "tool" as const, content: [result("a")] },
+      { role: "assistant" as const, content: "done" },
+    ];
+    const w = windowHistory(history, 2);
+    expect(w[0]!.role).toBe("assistant");
+    expect(w).toHaveLength(3);
+    expect(repairToolHistory([{ role: "tool", content: [result("zzz")] }, ...history])[0]!.role).toBe("user");
   });
 });
 

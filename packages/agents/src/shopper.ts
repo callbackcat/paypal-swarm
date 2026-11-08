@@ -3,6 +3,7 @@ import { ALLOWLISTS, cardFor, type DeclineKind } from "@swarm/paypal";
 import { generateText, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
 import { normaliseUsage, ZERO_USAGE } from "./llm";
+import { windowHistory } from "./history";
 import { byName, logged, ok, fail, platformTool, toToolSet, type AgentTool } from "./tools";
 import type { CatalogItem, OrderRecord, World } from "./world";
 
@@ -157,10 +158,12 @@ function catalogBlock(view: CatalogItem[]) {
 }
 
 function compact(history: ModelMessage[], keep = 6): ModelMessage[] {
-  if (history.length <= keep) return history;
-  const dropped = history.slice(0, history.length - keep);
-  const summary = `Earlier in this session you exchanged ${dropped.length} messages/tool calls (orders created and paid as described above).`;
-  return [{ role: "user", content: summary }, ...history.slice(-keep)];
+  if (history.length <= keep) return windowHistory(history, history.length);
+  const tail = windowHistory(history, keep);
+  const dropped = history.length - tail.length;
+  if (dropped === 0) return tail;
+  const summary = `Earlier in this session you exchanged ${dropped} messages/tool calls (orders created and paid as described above).`;
+  return [{ role: "user", content: summary }, ...tail];
 }
 
 /** One shopper's whole session: live LLM when available, scripted otherwise, scripted fallback when the budget guard says stop. */
@@ -184,7 +187,7 @@ async function liveShopper(world: World, persona: Persona, tools: AgentTool[]) {
   let history: ModelMessage[] = [
     {
       role: "user",
-      content: `${persona.backstory}\n\nToday's catalog:\n${catalogBlock(view)}\n\nStart shopping. Budget: $${persona.budget}.`,
+      content: `${persona.backstory}${world.o.scenario.brief ? `\n\nSpecial brief for this run (stay in character, but lean into it): ${world.o.scenario.brief}` : ""}\n\nToday's catalog:\n${catalogBlock(view)}\n\nStart shopping. Budget: ${persona.budget}.`,
     },
   ];
   const maxTurns = world.o.scenario.shopperTurns;

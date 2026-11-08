@@ -47,6 +47,21 @@ describe("swarm api (memory store, mock PayPal, scripted agents)", () => {
     expect(Object.keys(doc.paths)).toEqual(expect.arrayContaining(["/runs", "/runs/{id}/events", "/webhooks/paypal", "/ai/studio-turn", "/runs/{id}/report"]));
   });
 
+  it("plans a run from one sentence without a key", async () => {
+    const h = harness();
+    const r = await h.post("/ai/plan-run", { text: "Try breaking checkout with 12 impatient bargain hunters on Black Friday, hardened merchant, compare both" });
+    expect(r.status).toBe(200);
+    const body = (await r.json()) as { source: string; plan: { scenario: string; merchantProfile: string; shoppers: number | null; bothProfiles: boolean; brief: string | null }; config: { scenario: string; shoppers?: number; brief?: string } };
+    expect(body.source).toBe("heuristic");
+    expect(body.plan.scenario).toBe("black-friday");
+    expect(body.plan.merchantProfile).toBe("hardened");
+    expect(body.plan.shoppers).toBe(12);
+    expect(body.plan.bothProfiles).toBe(true);
+    expect(body.config.brief).toContain("bargain hunters");
+    const bad = await h.post("/ai/plan-run", { text: "x" });
+    expect(bad.status).toBe(400);
+  });
+
   it("creates a run, streams it, and renders the report in JSON and Markdown", async () => {
     const h = harness();
     const created = await h.post("/runs", { scenario: "quiet-tuesday", merchantProfile: "baseline" });
