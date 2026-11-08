@@ -98,21 +98,32 @@ The animation is an [ascii-magic-art](https://www.ascii-magic.com/ascii/docs) pi
 
 | Screen | What it shows |
 |---|---|
-| **Setup** | Scenario cards with the chaos schedule, merchant profile, shoppers, token cap, approval threshold, PayPal and LLM mode, a pre-run **token + USD estimate** that refuses to start over cap, and the per-agent **PayPal allow-lists**. |
+| **Setup** | A chat-style launcher: type one sentence ("Try breaking checkout with impatient bargain hunters on Black Friday, then compare the hardened merchant") or pick a preset, and `POST /ai/plan-run` turns it into a plan you confirm (scenario, merchant profile, shoppers, model, a brief handed to every shopper, the estimate) before anything is spent; a keyword parser does the same without a key. Below it, Fine-tune: scenario cards with the chaos schedule, merchant profile, shoppers, brief, token cap, approval threshold, PayPal and LLM mode, a pre-run **token + USD estimate** that refuses to start over cap, and the per-agent **PayPal allow-lists**. |
 | **Arena** | Live SSE feed with actor filters, order board on the sim clock, webhook ticker with delivery lag, budget meter, **human-in-the-loop approvals** for refunds above threshold and dispute concessions, chaos injections, analyst insight chips that open the Studio with a prompt. Pause, resume, stop. |
-| **Report** | Score ring and grade, four dimension bars with deductions, stats, findings grouped by severity with **event trails and PayPal ids**, fix lines, cost footer, "what is simulated" note, Markdown and JSON export, **Re-run with fix**. |
+| **Report** | Score and grade, four dimension bars with deductions, stats, an **order funnel over simulated time** (created, captured, shipped, declined), **tokens by agent class**, a **before-and-after table** against the latest run of the same scenario with the other merchant profile, findings grouped by severity with **event trails and PayPal ids**, fix lines, cost footer, "what is simulated" note, Markdown and JSON export, **Re-run with fix**. |
 | **Studio** | AG Studio over five live tables (orders, events, agent turns, findings, webhooks). An **analyst agent** (Claude via OpenRouter through the api) with `viewSchema`, `executeQuery`, `addWidget` and friends, prompt starters from the run, autopilot from Arena insights. Its tokens count against the same run budget. |
 
 ## Scenarios
 
-| Scenario | Shoppers | Chaos | Live estimate |
-|---|---|---|---|
-| **Quiet Tuesday** | 5 | none | ≈ 45k tokens · $0.06 |
-| **Black Friday** | 40 in 6 min | 30-item catalog, injection product, 10 % declines, duplicate approvals, a 429 storm | ≈ 460k tokens · $0.35 (cap 600k) |
-| **Dispute storm** | 15 | 5 chargebacks with varied reasons (one adjudicated), oversized and double refunds | ≈ 170k tokens · $0.17 |
-| **Lost parcels** | 10 | half the parcels never get tracking, buyers ask after 3 sim hours, 30 % webhook drops | ≈ 110k tokens · $0.10 |
+| Scenario | Shoppers | Chaos | Pre-run estimate (all Haiku 5.5) | Measured, 8 Nov 2026 (all Haiku 5.5) |
+|---|---|---|---|---|
+| **Quiet Tuesday** | 5 | none | ≈ 68k billable tokens · $0.014 (cap 400k) | $0.001–0.002 · 64–144 s wall · baseline 90, hardened 100 |
+| **Black Friday** | 40 in 6 min | 30-item catalog, injection product, 10 % declines, duplicate approvals, a 429 storm | ≈ 645k · $0.14 (cap 800k) | $0.024 · ≈ 250 s · baseline 75, hardened 100 |
+| **Dispute storm** | 15 | 5 chargebacks with varied reasons (one adjudicated), oversized and double refunds | ≈ 252k · $0.054 (cap 400k) | $0.008 · 125–160 s · baseline 90, hardened 100 |
+| **Lost parcels** | 10 | half the parcels never get tracking, buyers ask after 3 sim hours, 30 % webhook drops | ≈ 165k · $0.035 (cap 400k) | $0.003–0.005 · 75–105 s · baseline 80–90, hardened 100 |
 
-Estimates come from the estimator and the OpenRouter price table; scripted runs cost nothing. Each report's footer shows the measured number for that run. Subscription churn, Confused agent and Refund fraud-ish are listed as coming.
+The estimate is deliberately an upper bound: billable tokens are input minus cache reads plus output, and the estimator assumes less caching than OpenRouter delivers in practice (80–90 % of shopper input is served from cache). Each report's footer and its **Spend by agent** blocks show the measured number for that run. "Measured" is the Haiku-only configuration (`SWARM_MODEL_*=anthropic/claude-haiku-5.5`), PayPal sandbox, live LLM, one run per cell on 8 Nov 2026; the wall time includes the settle phase that fast-forwards the simulated clock to the 24-hour SLAs. Scripted runs cost nothing. Subscription churn, Confused agent and Refund fraud-ish are listed as coming.
+
+### Baseline against hardened, same scenario, same chaos
+
+| Scenario | Baseline | Hardened | What the fix removed |
+|---|---|---|---|
+| Quiet Tuesday | 90 (5 × CAPTURE_WITHOUT_TRACKING) | 100 | the merchant now creates tracking after every capture |
+| Lost parcels | 80–90 (CAPTURE_WITHOUT_TRACKING, BUYER_LEFT_WAITING) | 100 | auto-tracking plus answering "where is my parcel" |
+| Dispute storm | 72–90 (CAPTURE_WITHOUT_TRACKING ×12, DISPUTE_UNANSWERED) | 100 | the dispute SLA loop answers every chargeback inside the window |
+| Black Friday | 65–75 (CAPTURE_DECLINED_UNHANDLED, CAPTURE_WITHOUT_TRACKING, BUYER_LEFT_WAITING) | 100 | capture status is read, declines are retried once and told to the buyer, tracking follows capture |
+
+Both profiles are prompt plus code, so the gap is reproducible; the hardened merchant costs about the same (it makes one more tool call per order and replies in fewer words).
 
 ## Readiness rules
 
@@ -139,7 +150,7 @@ The product must never burn a user's key.
 - **Three caps, checked before every model call.** Per turn (`maxOutputTokens` 400 / 800 / 1500 and step limits), per actor (12k shopper, 60k merchant, 20k analyst), per run (`tokenCap`, default 400k).
 - **Degrade, don't abort.** A capped shopper finishes with a scripted fallback (`budget.exhausted`); at 80 % the run stops admitting shoppers (`budget.warning`); at 100 % it drains and finishes as `finished_budget` with a full report.
 - **Small context by construction.** Compacted history, tool results trimmed before they enter the prompt (raw JSON stays in the log), a shared shopper prefix marked for OpenRouter prompt caching.
-- **Cheap crowd.** Haiku for shoppers, Sonnet for merchant and analyst; any OpenRouter model id is one env change away.
+- **Cheap crowd.** Haiku for shoppers by default, Sonnet for merchant and analyst (`SWARM_MODEL_*`); the measured numbers above and the model comparison below ran everything on Haiku. Any OpenRouter model id is one env change or one Setup dropdown away.
 - **Dev cache and seeded personas.** `LLM_CACHE=1` makes identical prompts free while iterating; personas come from a seeded PRNG so re-runs compare.
 - **Demo-key fence.** The server's own key sits behind a per-IP daily allowance. Bring-your-own keys are not fenced and are AES-GCM encrypted at rest.
 
