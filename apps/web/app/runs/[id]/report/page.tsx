@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, fmtLag, fmtSim, fmtTokens, fmtUsd, isTerminal, type Dimension, type Finding, type Report, type RunStatus as RunStatusView, type SwarmEvent } from "@/lib/api";
 import { summarize } from "@/lib/arena";
 import { ErrorAlert, LinkButton, ModeTags, RunStatus, SeverityTag } from "@/components/ui";
+import { ReportCharts } from "@/components/ReportCharts";
 import { Button } from "@/components/sodium/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleGroup, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
 import { DataList, DataListItem, DataListLabel, DataListValue } from "@/components/sodium/ui/data-list";
@@ -32,6 +33,7 @@ export default function ReportPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [run, setRun] = useState<RunStatusView | null>(null);
   const [events, setEvents] = useState<Map<number, SwarmEvent>>(new Map());
+  const [allEvents, setAllEvents] = useState<SwarmEvent[]>([]);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
 
@@ -44,11 +46,10 @@ export default function ReportPage() {
         setReport(r);
         setRun(s);
         const ids = new Set(r.findings.flatMap((f) => f.eventIds));
-        if (ids.size) {
-          const ev = await api.events(id, 0);
-          if (!alive) return;
-          setEvents(new Map(ev.events.filter((e) => e.id !== undefined && ids.has(e.id)).map((e) => [e.id as number, e])));
-        }
+        const ev = await api.events(id, 0);
+        if (!alive) return;
+        setAllEvents(ev.events);
+        setEvents(new Map(ev.events.filter((e) => e.id !== undefined && ids.has(e.id)).map((e) => [e.id as number, e])));
       } catch (e) {
         if (alive) setError(e);
       }
@@ -247,6 +248,8 @@ export default function ReportPage() {
           </StatusStripValue>
         </StatusStripCell>
       </StatusStrip>
+
+      <ReportCharts runId={id} report={report} events={allEvents} />
 
       <Frame aria-label="Findings">
         <FrameHeader>
