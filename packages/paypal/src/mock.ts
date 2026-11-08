@@ -77,6 +77,10 @@ export function mockBackend(opts: MockOptions = {}): PayPalBackend & { store: Mo
     createOrderWithoutSource: async (i) => store.guard(() => ok(store.createOrder({ amount: Number(i.amount), items: [{ name: i.description ?? "item", quantity: 1, unit_amount: money(Number(i.amount)) }] }), 201)),
     confirmWithCard: (orderId, card) => store.confirm(orderId, card),
     captureOrder: async (orderId, o) => store.guard(() => store.capture(orderId, o?.mockIssue)),
+    addTracking: async (i) => {
+      const t = store.tools({ shipment: { create: true } }).find((x) => x.name === "create_shipment_tracking")!;
+      return t.run({ transaction_id: i.captureId, tracking_number: i.trackingNumber, status: i.status ?? "SHIPPED", carrier: i.carrier });
+    },
     processChargeback: async (i) => {
       const d = store.openDispute(i.captureId, Number(i.amount), i.reasonCode);
       return d ? { httpStatus: 201, disputeId: d.dispute_id, raw: { links: [{ href: `https://api-m.sandbox.paypal.com/v1/customer/disputes/${d.dispute_id}`, rel: "self" }] } } : { httpStatus: 404, raw: { name: "RESOURCE_NOT_FOUND" } };

@@ -255,6 +255,8 @@ export class World {
   readonly counts = new Map<string, number>();
   readonly captureLatenciesSim: number[] = [];
   readonly flags = { captureLock: new Set<string>() };
+  /** True while the merchant is inside a turn: the inbox is already empty then, but the work is not done. */
+  merchantBusy = false;
   private shoppersDone = 0;
 
   constructor(readonly o: WorldOptions) {

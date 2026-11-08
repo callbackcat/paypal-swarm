@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/honeycomb.svg" alt="paypal-swarm logo: a honeycomb" width="96" height="96">
+  <img src="assets/logo.svg" alt="paypal-swarm logo: a swarm of yellow squares" width="96" height="96">
 </p>
 
 <h1 align="center">paypal-swarm</h1>
@@ -197,6 +197,8 @@ pnpm spike:chargeback    # process-chargeback → list_disputes → adjudicate
 pnpm seed -- --overload --injection   # demo catalog (+18 filler items, +1 prompt-injection product)
 pnpm dev
 ```
+
+Shipment tracking: the toolkit posts to `/v1/shipping/trackers-batch`, which answers `NOT_AUTHORIZED` unless the REST app has the Tracking permission. Swarm then falls back to `POST /v2/checkout/orders/{id}/track` (plain checkout scopes) and logs the tool result with `via: orders-v2-track`, so the merchant still ships.
 
 Register `https://<api host>/webhooks/paypal` under Sandbox Webhooks in the developer dashboard and put the id in `PAYPAL_WEBHOOK_ID`. `/healthz` then reports `paypal: sandbox`, `llm: live`, `webhooks: true`.
 

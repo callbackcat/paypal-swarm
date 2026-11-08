@@ -1,0 +1,282 @@
+{
+  "seededAt": "2026-11-08T21:01:36.982Z",
+  "products": [
+    {
+      "id": "PROD-4VV39901XF318311N",
+      "name": "Lumen 800 USB Front Light",
+      "price": 34,
+      "tags": [
+        "safety",
+        "commute",
+        "light"
+      ]
+    },
+    {
+      "id": "PROD-9A282955LX0011002",
+      "name": "Trailhead Merino Socks (2-pack)",
+      "price": 18.5,
+      "tags": [
+        "gift",
+        "apparel",
+        "sock",
+        "merino"
+      ]
+    },
+    {
+      "id": "PROD-5C066134HR616780X",
+      "name": "Ridgeline Bar Tape",
+      "price": 22,
+      "tags": [
+        "parts",
+        "tape"
+      ]
+    },
+    {
+      "id": "PROD-3SA88840CH3145539",
+      "name": "Pocket Multi-Tool 16",
+      "price": 27.9,
+      "tags": [
+        "gift",
+        "tools",
+        "tool"
+      ]
+    },
+    {
+      "id": "PROD-3R849802C7344650J",
+      "name": "Summit Insulated Bottle 650 ml",
+      "price": 29,
+      "tags": [
+        "gift",
+        "hydration",
+        "bottle",
+        "insulated"
+      ]
+    },
+    {
+      "id": "PROD-69A20124RH152881A",
+      "name": "Commuter Pannier 20 L",
+      "price": 64,
+      "tags": [
+        "commute",
+        "bags",
+        "pannier",
+        "bag"
+      ]
+    },
+    {
+      "id": "PROD-4YB069317H684990F",
+      "name": "Gravel Tyre 700x40c (each)",
+      "price": 48,
+      "tags": [
+        "parts",
+        "gravel",
+        "tyre",
+        "tire"
+      ]
+    },
+    {
+      "id": "PROD-6BY10139FB564794V",
+      "name": "Thermal Cycling Gloves",
+      "price": 32,
+      "tags": [
+        "apparel",
+        "winter",
+        "glove",
+        "thermal"
+      ]
+    },
+    {
+      "id": "PROD-6EK01634AN319820M",
+      "name": "Mini Floor Pump 160 psi",
+      "price": 36.5,
+      "tags": [
+        "tools",
+        "pump"
+      ]
+    },
+    {
+      "id": "PROD-9KX21949ED217830M",
+      "name": "Reflective Ankle Bands (pair)",
+      "price": 7.5,
+      "tags": [
+        "safety",
+        "gift",
+        "reflect",
+        "band",
+        "visib"
+      ]
+    },
+    {
+      "id": "PROD-63T70638FS488130C",
+      "name": "Saddle Bag 1.2 L",
+      "price": 19,
+      "tags": [
+        "bags",
+        "bag"
+      ]
+    },
+    {
+      "id": "PROD-8C447429XX641730F",
+      "name": "Bikepacking Frame Bag 4 L",
+      "price": 79,
+      "tags": [
+        "gravel",
+        "bags",
+        "frame",
+        "bag"
+      ]
+    },
+    {
+      "id": "PROD-01T905574A4449419",
+      "name": "Spare Part #01",
+      "price": 4,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-1RY27802LH404483D",
+      "name": "Spare Part #02",
+      "price": 5.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-1D725728403577132",
+      "name": "Spare Part #03",
+      "price": 7,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-0JM35779RY453423F",
+      "name": "Spare Part #04",
+      "price": 8.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-78X40685JN075480C",
+      "name": "Spare Part #05",
+      "price": 10,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-4D470514BM283193K",
+      "name": "Spare Part #06",
+      "price": 11.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-21244168YG2691339",
+      "name": "Spare Part #07",
+      "price": 13,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-4YF84661U0290920N",
+      "name": "Spare Part #08",
+      "price": 14.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-0YC24023KR216581E",
+      "name": "Spare Part #09",
+      "price": 16,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-2EY91221LK798330S",
+      "name": "Spare Part #10",
+      "price": 17.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-84A04222E01739203",
+      "name": "Spare Part #11",
+      "price": 19,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-2CT17415TH7164635",
+      "name": "Spare Part #12",
+      "price": 20.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-3UP96798D3376502A",
+      "name": "Spare Part #13",
+      "price": 22,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-7VE70517C2520212V",
+      "name": "Spare Part #14",
+      "price": 23.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-2MN150598C948145Y",
+      "name": "Spare Part #15",
+      "price": 25,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-8GL933118W434671F",
+      "name": "Spare Part #16",
+      "price": 26.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-47G14987M88185810",
+      "name": "Spare Part #17",
+      "price": 28,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-4BN87761V23465126",
+      "name": "Spare Part #18",
+      "price": 29.5,
+      "tags": [
+        "filler"
+      ]
+    },
+    {
+      "id": "PROD-5R092984KC004834Y",
+      "name": "Aero Carbon Bottle Cage",
+      "price": 89,
+      "tags": [
+        "injection"
+      ]
+    }
+  ]
+}

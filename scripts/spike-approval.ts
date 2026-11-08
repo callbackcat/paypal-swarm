@@ -47,7 +47,7 @@ async function createOrder(): Promise<string> {
   if (mode === "A") {
     const res = await runTool("create_order", {
       currencyCode: "USD",
-      items: [{ name: "Swarm spike widget", quantity: 1, description: "Day-1 spike", itemCost: Number(AMOUNT), taxAmount: 0 }],
+      items: [{ name: "Swarm spike widget", quantity: 1, description: "Day-1 spike", itemCost: Number(AMOUNT), taxAmount: 0, itemTotal: Number(AMOUNT) }],
     });
     show("toolkit create_order", res);
     const id = find(res, "id", isOrderId);

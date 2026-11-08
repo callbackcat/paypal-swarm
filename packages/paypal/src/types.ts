@@ -69,6 +69,8 @@ export interface PayPalBackend {
   createOrderWithoutSource(input: { amount: string; currency?: string; description?: string; referenceId?: string }): Promise<ToolOutcome>;
   /** Buyer approval without a browser: confirm-payment-source with a sandbox card. */
   confirmWithCard(orderId: string, card: CardDetails): Promise<ConfirmResult>;
+  /** Orders v2 tracking (POST /v2/checkout/orders/{id}/track). The fallback when the REST app lacks the v1 trackers permission. */
+  addTracking(input: { orderId: string; captureId: string; trackingNumber: string; carrier?: string; status?: string }): Promise<ToolOutcome>;
   /** Hardened merchant capture: idempotent request id, optional forced decline. */
   captureOrder(orderId: string, opts?: { requestId?: string; mockIssue?: "INSTRUMENT_DECLINED" | "TRANSACTION_REFUSED" }): Promise<ToolOutcome>;
   processChargeback(input: { captureId: string; amount: string; currency?: string; merchantId?: string; reasonCode?: string }): Promise<{ httpStatus: number; disputeId?: string; raw: unknown }>;
@@ -82,15 +84,15 @@ export interface PayPalBackend {
 export function summariseCapture(orderOrCapture: unknown): CaptureSummary {
   const o = orderOrCapture as Record<string, unknown> | undefined;
   if (!o) return {};
-  const captures =
-    (o.purchase_units as Array<{ payments?: { captures?: Array<Record<string, unknown>> } }> | undefined)?.[0]?.payments?.captures ??
-    (o.captures as Array<Record<string, unknown>> | undefined);
-  const cap = captures?.[0] ?? (typeof o.status === "string" && typeof o.id === "string" && !o.purchase_units ? o : undefined);
+  type PU = Array<{ payments?: { captures?: Array<Record<string, unknown>> } }> | undefined;
+  const units = (o.purchase_units ?? o.purchaseUnits) as PU;
+  const captures = units?.[0]?.payments?.captures ?? (o.captures as Array<Record<string, unknown>> | undefined);
+  const cap = captures?.[0] ?? (typeof o.status === "string" && typeof o.id === "string" && !units ? o : undefined);
   if (!cap) return {};
   return {
     captureId: cap.id as string | undefined,
     captureStatus: cap.status as string | undefined,
     amount: cap.amount as CaptureSummary["amount"],
-    processorResponse: cap.processor_response as Record<string, unknown> | undefined,
+    processorResponse: (cap.processor_response ?? cap.processorResponse) as Record<string, unknown> | undefined,
   };
 }

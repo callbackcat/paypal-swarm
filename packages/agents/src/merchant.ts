@@ -106,8 +106,29 @@ export function merchantTools(world: World): AgentTool[] {
   if (pp.get_refund) tools.push(logged(world, pp.get_refund, { actor: MERCHANT, actorClass: "merchant" }));
 
   if (pp.create_shipment_tracking) {
+    const toolkitTracking = pp.create_shipment_tracking;
     tools.push(
-      logged(world, pp.create_shipment_tracking, {
+      platformTool(
+        world,
+        {
+          name: toolkitTracking.name,
+          description: toolkitTracking.description,
+          inputSchema: toolkitTracking.inputSchema,
+          run: async (input) => {
+            const r = await toolkitTracking.run(input);
+            if (r.ok || r.status !== 403) return r;
+            // The toolkit posts to v1 /shipping/trackers-batch, which needs the Tracking permission on the REST app
+            // (NOT_AUTHORIZED otherwise). Orders v2 /track works with plain checkout scopes, so fall back to it.
+            const captureId = String(input.transaction_id ?? "");
+            const rec = findByCapture(captureId);
+            if (!rec) return r;
+            const v2 = await world.o.backend.addTracking({ orderId: rec.orderId, captureId, trackingNumber: String(input.tracking_number ?? ""), carrier: input.carrier as string | undefined, status: input.status as string | undefined });
+            if (!v2.ok) return v2;
+            const tracker = { transaction_id: captureId, tracking_number: String(input.tracking_number ?? ""), status: String(input.status ?? "SHIPPED"), carrier: input.carrier };
+            return { ...v2, data: { trackers: [tracker], via: "orders-v2-track", note: "v1 trackers-batch returned NOT_AUTHORIZED for this app; tracking was added through POST /v2/checkout/orders/{id}/track" } };
+          },
+        },
+        {
         actor: MERCHANT,
         actorClass: "merchant",
         before: (input) => {
@@ -134,7 +155,8 @@ export function merchantTools(world: World): AgentTool[] {
           }
           await world.emit("order.shipped", MERCHANT, "merchant", { orderId: rec?.orderId, captureId, personaId: rec?.personaId, trackingNumber: tracking, carrier: input.carrier, status: input.status ?? "SHIPPED" }, [captureId, ...(rec ? [rec.orderId] : [])]);
         },
-      }),
+        },
+      ),
     );
   }
   for (const n of ["get_shipment_tracking", "update_shipment_tracking", "list_disputes", "get_dispute"] as const) if (pp[n]) tools.push(logged(world, pp[n]!, { actor: MERCHANT, actorClass: "merchant" }));
@@ -245,6 +267,7 @@ export async function runMerchant(world: World): Promise<void> {
     }
     const batch = world.merchantInbox.takeAll();
     if (batch.length === 0) continue;
+    world.merchantBusy = true;
     try {
       if (world.o.llm && guard.check(MERCHANT, "merchant").ok) {
         const model = world.o.llm.model(world.o.models.merchant);
@@ -271,6 +294,8 @@ export async function runMerchant(world: World): Promise<void> {
       if (world.o.control.stopped) break;
       world.log(`merchant turn failed: ${(e as Error).stack ?? e}`);
       await world.emit("agent.turn", MERCHANT, "merchant", { actor: MERCHANT, error: String((e as Error).message ?? e), usage: ZERO_USAGE, costUsd: 0 });
+    } finally {
+      world.merchantBusy = false;
     }
   }
 }

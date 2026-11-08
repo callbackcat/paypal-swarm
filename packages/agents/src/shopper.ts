@@ -43,7 +43,23 @@ export function shopperTools(world: World, persona: Persona): AgentTool[] {
     await world.emit("order.created", persona.id, "shopper", { orderId: rec.orderId, personaId: persona.id, personaName: persona.name, amount: { currency_code: "USD", value: rec.amount.toFixed(2) }, items, catalogPosition: rec.catalogPosition, catalogSize: view.length, budget: persona.budget, status: data.status }, [rec.orderId]);
   };
 
-  if (base.show_product_details) tools.push(logged(world, base.show_product_details, { actor: persona.id, actorClass: "shopper" }));
+  if (base.show_product_details) {
+    // Models sometimes pass the product name, or the id with the dashes dropped. Resolve against the catalog view
+    // instead of sending PayPal a 404 round trip.
+    const norm = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    tools.push(
+      logged(world, base.show_product_details, {
+        actor: persona.id,
+        actorClass: "shopper",
+        before: (input) => {
+          const pid = String(input.product_id ?? "");
+          if (!pid || view.some((c) => c.id === pid)) return undefined;
+          const match = view.find((c) => c.id && (norm(c.id) === norm(pid) || norm(c.name) === norm(pid)));
+          return match ? { input: { ...input, product_id: match.id } } : undefined;
+        },
+      }),
+    );
+  }
 
   if (world.o.orderCreatePath === "toolkit" && base.create_order) {
     tools.push(logged(world, base.create_order, { actor: persona.id, actorClass: "shopper", after: registerOrder }));

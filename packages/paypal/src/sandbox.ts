@@ -23,10 +23,12 @@ export function sandboxBackend(creds: PayPalCreds): PayPalBackend {
   const orders = new OrdersController(sdk);
   let learnedMerchantId = creds.merchantId;
 
+  // The Server SDK returns camelCase models (purchaseUnits, processorResponse); every reader in Swarm, the
+  // toolkit included, speaks PayPal's REST snake_case, so SDK results are converted at this boundary.
   const sdkOutcome = async (fn: () => Promise<{ result: unknown; statusCode: number }>): Promise<ToolOutcome> => {
     try {
       const { result, statusCode } = await fn();
-      return { ok: true, status: statusCode, data: result };
+      return { ok: true, status: statusCode, data: snakeCaseDeep(result) };
     } catch (e: unknown) {
       const err = e as { statusCode?: number; result?: unknown; body?: unknown; message?: string };
       const body = err.result ?? (typeof err.body === "string" ? safeJson(err.body) : err.body) ?? { message: err.message };
@@ -75,6 +77,9 @@ export function sandboxBackend(creds: PayPalCreds): PayPalBackend {
       return { httpStatus: r.status, orderStatus: body.status as string | undefined, issue: c?.issue, merchantId, raw: body };
     },
 
+    addTracking: async (i) =>
+      toOutcome(await rest.call("POST", `/v2/checkout/orders/${i.orderId}/track`, { capture_id: i.captureId, tracking_number: i.trackingNumber, carrier: i.carrier ?? "OTHER", notify_payer: false })),
+
     captureOrder: (orderId, opts) =>
       sdkOutcome(() =>
         orders.captureOrder({
@@ -99,6 +104,16 @@ export function sandboxBackend(creds: PayPalCreds): PayPalBackend {
     acceptClaim: async (id, note) => toOutcome(await rest.acceptClaim(id, note)),
     verifyWebhook: (input) => rest.verifyWebhookSignature(input),
   };
+}
+
+const snakeKey = (k: string) => k.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+/** Deep camelCase → snake_case on keys only; values (ids, enums, URLs) are untouched. */
+export function snakeCaseDeep(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(snakeCaseDeep);
+  if (v && typeof v === "object" && Object.getPrototypeOf(v) === Object.prototype) {
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [snakeKey(k), snakeCaseDeep(x)]));
+  }
+  return v;
 }
 
 function toOutcome(r: { status: number; body: unknown }): ToolOutcome {

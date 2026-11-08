@@ -113,12 +113,19 @@ async function execute(runId: string, config: RunConfig, deps: RunDeps, control:
     ),
   );
 
-  // Drain: let the merchant and chaos finish what is queued, then stop everyone.
+  // Drain: let the merchant and chaos finish what is queued, then stop everyone. A merchant turn that is in
+  // flight counts as queued work (the inbox empties when the batch is taken), and gets a bounded grace period
+  // past drainMs so a live model is not aborted mid-capture.
   const drainStart = Date.now();
-  while (!control.stopped && Date.now() - drainStart < pacing.drainMs) {
-    if (world.merchantInbox.size === 0 && budget.isExhausted) break;
+  const quietMs = Math.min(pacing.drainMs, Math.max(1500, pacing.stepMs * 3));
+  const graceMs = 20_000;
+  while (!control.stopped) {
+    const elapsed = Date.now() - drainStart;
+    const pending = world.merchantInbox.size > 0 || world.merchantBusy;
+    if (!pending && (budget.isExhausted || elapsed >= quietMs)) break;
+    if (elapsed >= pacing.drainMs && !world.merchantBusy) break;
+    if (elapsed >= pacing.drainMs + graceMs) break;
     await world.sleep(Math.min(500, pacing.drainMs));
-    if (world.merchantInbox.size === 0 && Date.now() - drainStart >= Math.min(pacing.drainMs, Math.max(1500, pacing.stepMs * 3))) break;
   }
   const reason: RunResult["reason"] = control.stopped ? (control.stopReason === "timeout" ? "timeout" : "stopped") : budget.isExhausted ? "budget" : "completed";
   control.stop(reason);
