@@ -49,7 +49,16 @@ const turnRow = (e: SwarmEvent): Row => {
   return { id: e.id ?? 0, simMin: e.simT, actor: e.actor, actorClass: e.actorClass, model: String(e.payload.model ?? ""), inputTokens: u.inputTokens ?? 0, outputTokens: u.outputTokens ?? 0, cachedTokens: u.cachedTokens ?? 0, costUsd: Number(e.payload.costUsd ?? 0), toolCalls: Array.isArray(e.payload.toolCalls) ? (e.payload.toolCalls as string[]).join(",") : "", scripted: !!e.payload.scripted };
 };
 const findingRow = (f: Finding, i: number): Row => ({ id: i + 1, rule: f.rule, severity: f.severity, dimension: f.dimension, title: f.title, detail: f.detail, fix: f.fix, events: f.eventIds.join(" "), paypalIds: f.paypalIds.join(" ") });
-const webhookRow = (e: SwarmEvent): Row => ({ id: e.id ?? 0, simMin: e.simT, eventType: String(e.payload.eventType ?? ""), lagMs: typeof e.payload.lagMs === "number" ? e.payload.lagMs : null, matchedType: String(e.payload.matchedType ?? ""), verified: !!e.payload.verified, source: String(e.payload.source ?? "") });
+// Tables that can start empty declare their fields, so the analyst sees the schema and Studio does not warn before rows arrive.
+const FINDING_FIELDS = [
+  { id: "id", format: "integerFormat" }, { id: "rule", format: "textFormat" }, { id: "severity", format: "textFormat" }, { id: "dimension", format: "textFormat" },
+  { id: "title", format: "textFormat" }, { id: "detail", format: "textFormat" }, { id: "fix", format: "textFormat" }, { id: "events", format: "textFormat" }, { id: "paypalIds", format: "textFormat" },
+] as const;
+const WEBHOOK_FIELDS = [
+  { id: "id", format: "integerFormat" }, { id: "simMin", format: "integerFormat" }, { id: "eventType", format: "textFormat" }, { id: "lagMs", format: "integerFormat" },
+  { id: "matchedType", format: "textFormat" }, { id: "verified", format: "textFormat" }, { id: "source", format: "textFormat" },
+] as const;
+const webhookRow = (e: SwarmEvent): Row => ({ id: e.id ?? 0, simMin: e.simT, eventType: String(e.payload.eventType ?? ""), lagMs: typeof e.payload.lagMs === "number" ? e.payload.lagMs : null, matchedType: String(e.payload.matchedType ?? ""), verified: e.payload.verified ? "yes" : "no", source: String(e.payload.source ?? "") });
 
 function describe(run: RunStatus | null, report: Report | null, state: ArenaState) {
   const lines = [
@@ -126,8 +135,8 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
         { id: "orders", name: "Orders", description: "One row per PayPal order created by a shopper, with capture and tracking latency in simulated minutes.", primaryKeyField: "orderId", transactions: "all", data: [...initial.state.orders.values()].map(orderRow) },
         { id: "events", name: "Events", description: "The run's full event log: agent turns, tool calls, PayPal results and errors, webhooks, chaos injections.", primaryKeyField: "id", transactions: "all", data: initial.events.map(eventRow) },
         { id: "turns", name: "Agent turns", description: "One row per agent turn with model, tokens and USD cost.", primaryKeyField: "id", transactions: "all", data: initial.events.filter((e) => e.type === "agent.turn").map(turnRow) },
-        { id: "findings", name: "Findings", description: "Readiness rules that fired, with severity, dimension, fix and the event ids behind each.", primaryKeyField: "id", transactions: "all", data: (report?.findings ?? []).map(findingRow) },
-        { id: "webhooks", name: "Webhooks", description: "PayPal webhooks matched to this run, with delivery lag in milliseconds.", primaryKeyField: "id", transactions: "all", data: initial.events.filter((e) => e.type === "webhook.received").map(webhookRow) },
+        { id: "findings", name: "Findings", description: "Readiness rules that fired, with severity, dimension, fix and the event ids behind each.", primaryKeyField: "id", transactions: "all", fields: [...FINDING_FIELDS], data: (report?.findings ?? []).map(findingRow) },
+        { id: "webhooks", name: "Webhooks", description: "PayPal webhooks matched to this run, with delivery lag in milliseconds.", primaryKeyField: "id", transactions: "all", fields: [...WEBHOOK_FIELDS], data: initial.events.filter((e) => e.type === "webhook.received").map(webhookRow) },
       ],
     };
     // Initial snapshot only; later rows arrive as transactions.
