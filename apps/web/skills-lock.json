@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "build-design-system": {
+      "source": "arla6ka/design.how",
+      "sourceType": "github",
+      "skillPath": "skills/build-design-system/SKILL.md",
+      "computedHash": "c4fdf6693d439918d54fe0e342b358f744d2d77da36ae60e4256c88077e3ab3d"
+    },
+    "component-docs": {
+      "source": "arla6ka/design.how",
+      "sourceType": "github",
+      "skillPath": "skills/component-docs/SKILL.md",
+      "computedHash": "a363f82853c11f3856355c8c2f7a552431fd3250ee3976d4a481135d725fb6cf"
+    },
+    "design-system-boss": {
+      "source": "arla6ka/design.how",
+      "sourceType": "github",
+      "skillPath": "skills/design-system-boss/SKILL.md",
+      "computedHash": "77216919db6683832304c7bceb39eb4b28b458b6de130034f309dcb6741eefdf"
+    },
+    "migrate-design-system": {
+      "source": "arla6ka/design.how",
+      "sourceType": "github",
+      "skillPath": "skills/migrate-design-system/SKILL.md",
+      "computedHash": "d775b551a2a0ab7e1ceb1b3f738ec1d4a9ba8bdb39f7b4aa5b937b4f885aaf01"
+    },
+    "token-mapping": {
+      "source": "arla6ka/design.how",
+      "sourceType": "github",
+      "skillPath": "skills/token-mapping/SKILL.md",
+      "computedHash": "8c478933f958ea64a029cb1d47988a656e96266af7fc094421c3ac6fef738223"
+    },
+    "ui-review": {
+      "source": "arla6ka/design.how",
+      "sourceType": "github",
+      "skillPath": "skills/ui-review/SKILL.md",
+      "computedHash": "42c3d064b9be8fa9ca17795380c01da916bb3d914d65ef10aa1b1ebb9389a1a6"
+    }
+  }
+}

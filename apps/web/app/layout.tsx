@@ -1,33 +1,24 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import "@/components/sodium/styles.css";
 import "./globals.css";
+import { SodiumPortalProvider } from "@/lib/sodium/portal";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "Swarm · agentic-commerce flight simulator",
-  description: "Unleash LLM shoppers, a merchant agent and a chaos agent on a PayPal sandbox store. Watch it live. Get an agent-readiness report.",
+  title: "Swarm: agentic-commerce flight simulator",
+  description: "Point LLM shoppers, a merchant agent and a chaos agent at a PayPal sandbox store. Watch it live. Get an agent-readiness report.",
 };
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen antialiased">
-        <header className="sticky top-0 z-40 border-b" style={{ borderColor: "var(--line)", background: "color-mix(in srgb, var(--bg) 85%, transparent)", backdropFilter: "blur(8px)" }}>
-          <div className="mx-auto flex max-w-[1440px] items-center justify-between px-4 py-3">
-            <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-              <span className="inline-block h-5 w-5 rounded-md" style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))" }} />
-              Swarm
-              <span className="muted ml-2 hidden text-xs font-normal sm:inline">agentic-commerce flight simulator for PayPal merchants</span>
-            </Link>
-            <nav className="flex items-center gap-4 text-sm">
-              <Link href="/" className="muted hover:text-white">Setup</Link>
-              <Link href="/runs" className="muted hover:text-white">Runs</Link>
-              <a href={API + "/docs"} target="_blank" rel="noreferrer" className="muted hover:text-white">API docs</a>
-            </nav>
+    <html lang="en" data-theme="dark">
+      <body className="sodium">
+        <SodiumPortalProvider>
+          <div className="flex min-h-dvh flex-col bg-page text-text-1">
+            <SiteHeader />
+            <main className="flex w-full flex-1 flex-col gap-8 px-6 py-8">{children}</main>
           </div>
-        </header>
-        <main className="mx-auto max-w-[1440px] px-4 py-6">{children}</main>
+        </SodiumPortalProvider>
       </body>
     </html>
   );

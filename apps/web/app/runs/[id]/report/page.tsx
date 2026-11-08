@@ -1,10 +1,19 @@
 "use client";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { api, fmtLag, fmtSim, fmtTokens, fmtUsd, isTerminal, type Dimension, type Finding, type Report, type RunStatus, type SwarmEvent } from "@/lib/api";
-import { ACTOR_COLORS, summarize } from "@/lib/arena";
-import { Bar, Chip, Empty, ErrorBox, ModeBadges, ScoreRing, Section, SeverityChip, Stat, StatusChip } from "@/components/ui";
+import { api, fmtLag, fmtSim, fmtTokens, fmtUsd, isTerminal, type Dimension, type Finding, type Report, type RunStatus as RunStatusView, type SwarmEvent } from "@/lib/api";
+import { summarize } from "@/lib/arena";
+import { ErrorAlert, LinkButton, ModeTags, RunStatus, SeverityTag } from "@/components/ui";
+import { Button } from "@/components/sodium/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleGroup, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
+import { DataList, DataListItem, DataListLabel, DataListValue } from "@/components/sodium/ui/data-list";
+import { Empty, EmptyDescription, EmptyHeader, EmptyIcon, EmptyTitle } from "@/components/sodium/ui/empty-state";
+import { Frame, FrameBody, FrameDescription, FrameHeader, FrameStatus, FrameTitle, FrameValue } from "@/components/sodium/ui/frame";
+import { Meter, MeterLabel, MeterValue } from "@/components/sodium/ui/meter";
+import { Skeleton, SkeletonText } from "@/components/sodium/ui/skeleton";
+import { Status, StatusMark, type StatusValue } from "@/components/sodium/ui/status";
+import { StatusStrip, StatusStripCell, StatusStripLabel, StatusStripUnit, StatusStripValue } from "@/components/sodium/ui/status-strip";
+import { Tag } from "@/components/sodium/ui/tag";
 
 const DIM_LABEL: Record<Dimension, string> = { discoverability: "Discoverability", transactability: "Transactability", fulfilment: "Fulfilment", resilience: "Resilience" };
 const DIM_BLURB: Record<Dimension, string> = {
@@ -15,14 +24,15 @@ const DIM_BLURB: Record<Dimension, string> = {
 };
 const SEV_ORDER = ["critical", "high", "medium", "low", "info"] as const;
 
+const scoreStatus = (n: number): StatusValue => (n >= 85 ? "ok" : n >= 65 ? "warn" : "fail");
+
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [report, setReport] = useState<Report | null>(null);
-  const [run, setRun] = useState<RunStatus | null>(null);
+  const [run, setRun] = useState<RunStatusView | null>(null);
   const [events, setEvents] = useState<Map<number, SwarmEvent>>(new Map());
   const [error, setError] = useState<unknown>(null);
-  const [open, setOpen] = useState<Set<number>>(new Set());
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -55,10 +65,10 @@ export default function ReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, run?.status]);
 
-  const grouped = useMemo(() => {
+  const ordered = useMemo(() => {
     const g = new Map<string, Finding[]>();
     for (const f of report?.findings ?? []) g.set(f.severity, [...(g.get(f.severity) ?? []), f]);
-    return g;
+    return SEV_ORDER.flatMap((sev) => g.get(sev) ?? []);
   }, [report]);
 
   async function download(kind: "md" | "json") {
@@ -81,177 +91,267 @@ export default function ReportPage() {
     }
   }
 
-  if (!report) return error ? <ErrorBox error={error} /> : <Empty>Building report…</Empty>;
+  if (!report) {
+    return error ? (
+      <>
+        <h1 className="type-title">Report</h1>
+        <p className="type-code-sm text-text-2">{id}</p>
+        <ErrorAlert error={error} />
+      </>
+    ) : (
+      <div className="flex flex-col gap-4" aria-busy>
+        <Skeleton className="h-(--control-lg) w-full max-w-md" />
+        <SkeletonText lines={3} />
+      </div>
+    );
+  }
   const { score, stats, meta } = report;
   const live = run && !isTerminal(run.status);
   const otherProfile = meta.merchantProfile === "hardened" ? "baseline" : "hardened";
   const simulated = meta.paypalMode === "mock" || meta.llmMode === "scripted";
+  const untracked = stats.captured - stats.shipped;
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight">Agent-readiness report</h1>
-            {run && <StatusChip status={run.status} />}
-            <ModeBadges modes={meta.paypalMode && meta.llmMode ? { paypal: meta.paypalMode, llm: meta.llmMode } : run?.modes} compact />
-            <Chip tone="muted">{meta.merchantProfile} merchant</Chip>
-            {live && <Chip tone="warn">live preview, refreshing</Chip>}
-          </div>
-          <div className="muted mono mt-1 text-xs">
-            {meta.name} · {meta.scenario} · {id} · generated {new Date(report.generatedAt).toLocaleString()}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={`/runs/${id}`} className="btn">
-            Arena
-          </Link>
-          <Link href={`/runs/${id}/studio`} className="btn">
-            Studio
-          </Link>
-          <button className="btn" onClick={() => download("md")}>
-            ↓ Markdown
-          </button>
-          <button className="btn" onClick={() => download("json")}>
-            ↓ JSON
-          </button>
-          <button className="btn btn-primary" disabled={busy} onClick={() => rerun(otherProfile)}>
-            {busy ? "Starting…" : otherProfile === "hardened" ? "Re-run with fix (hardened)" : "Re-run as baseline"}
-          </button>
-        </div>
-      </header>
-      <ErrorBox error={error} />
-
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-        <Section title="Score" bodyClass="flex flex-col items-center gap-3">
-          <ScoreRing score={score.overall} grade={score.grade} size={150} />
-          <div className="muted text-center text-xs">
-            Weighted deductions per finding, capped per rule. Rate limits are infrastructure and never score.
-          </div>
-        </Section>
-        <Section title="Dimensions">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {(Object.keys(DIM_LABEL) as Dimension[]).map((d) => (
-              <div key={d}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium">{DIM_LABEL[d]}</span>
-                  <span className="mono">{score.dimensions[d]}</span>
-                </div>
-                <div className="mt-1">
-                  <Bar value={score.dimensions[d]} max={100} tone={score.dimensions[d] >= 85 ? "ok" : score.dimensions[d] >= 65 ? "warn" : "bad"} />
-                </div>
-                <div className="muted mt-1 text-xs">{DIM_BLURB[d]}</div>
-                {score.deductions.filter((x) => x.dimension === d).length > 0 && (
-                  <div className="mono muted mt-1 text-[11px]">
-                    {score.deductions
-                      .filter((x) => x.dimension === d)
-                      .map((x) => `${x.rule} ×${x.count} −${x.points}`)
-                      .join(" · ")}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Orders" value={`${stats.captured}/${stats.ordersCreated}`} sub={`captured / created · GMV ${fmtUsd(stats.gmvUsd)}`} />
-        <Stat label="Shipped" value={stats.shipped} sub={`${stats.captured - stats.shipped > 0 ? `${stats.captured - stats.shipped} captured without tracking` : "every capture tracked"}`} tone={stats.captured - stats.shipped > 0 ? "warn" : "ok"} />
-        <Stat label="Declined / refunded" value={`${stats.declined} / ${stats.refunded}`} />
-        <Stat label="Disputes" value={`${stats.disputesResolved}/${stats.disputesOpened}`} sub="resolved / opened" tone={stats.disputesOpened > stats.disputesResolved ? "bad" : undefined} />
-        <Stat label="Webhooks" value={stats.webhooks} sub={`median lag ${fmtLag(stats.webhookMedianLagMs)}`} />
-        <Stat label="PayPal errors" value={stats.paypalErrors} sub={`${stats.rateLimits} rate limits · ${stats.messages} messages`} tone={stats.paypalErrors ? "warn" : undefined} />
-      </div>
-
-      <Section title={`Findings (${report.findings.length})`} right={<span className="muted text-xs">each finding links the exact events and PayPal ids that triggered it</span>}>
-        {report.findings.length === 0 && <Empty>No findings. {stats.ordersCreated === 0 ? "No orders were created yet." : "This merchant handled everything the swarm threw at it."}</Empty>}
-        <div className="space-y-3">
-          {SEV_ORDER.flatMap((sev) => grouped.get(sev) ?? []).map((f, i) => {
-            const key = i;
-            const isOpen = open.has(key);
-            const trail = f.eventIds.map((eid) => events.get(eid)).filter((e): e is SwarmEvent => !!e);
-            return (
-              <article key={key} className="panel-2 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <SeverityChip severity={f.severity} />
-                    <span className="font-medium">{f.title}</span>
-                    <span className="mono muted text-[11px]">{f.rule}</span>
-                    <Chip tone="muted">{DIM_LABEL[f.dimension]}</Chip>
-                  </div>
-                  <button className="muted text-xs hover:text-white" onClick={() => setOpen((s) => new Set(isOpen ? [...s].filter((x) => x !== key) : [...s, key]))}>
-                    {isOpen ? "hide trail" : `event trail (${f.eventIds.length})`}
-                  </button>
-                </div>
-                <p className="mt-1 text-sm">{f.detail}</p>
-                <p className="mt-1 text-sm" style={{ color: "var(--ok)" }}>
-                  <span className="font-medium">Fix:</span> {f.fix}
-                </p>
-                {f.paypalIds.length > 0 && (
-                  <div className="mono muted mt-1 text-[11px]">
-                    PayPal ids: {f.paypalIds.join(", ")}
-                  </div>
-                )}
-                {isOpen && (
-                  <div className="mt-2 overflow-hidden rounded-lg" style={{ border: "1px solid var(--line)" }}>
-                    {trail.length === 0 && <div className="muted px-3 py-2 text-xs">events {f.eventIds.join(", ")}</div>}
-                    {trail.map((e) => (
-                      <div key={e.id} className="feed-row grid grid-cols-[40px_56px_90px_1fr] gap-2 px-3 py-1 text-xs">
-                        <span className="mono muted">#{e.id}</span>
-                        <span className="mono muted">{fmtSim(e.simT)}</span>
-                        <span className="truncate" style={{ color: ACTOR_COLORS[e.actorClass] }}>
-                          {e.actor}
-                        </span>
-                        <span>
-                          <span className="mono muted mr-1">{e.type}</span>
-                          {summarize(e)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      </Section>
-
-      <Section title="Cost & budget footer">
-        <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <div className="muted text-xs">Tokens</div>
-            <div className="mono">
-              {fmtTokens(stats.tokensIn + stats.tokensOut)} <span className="muted">({fmtTokens(stats.tokensIn)} in · {fmtTokens(stats.tokensOut)} out · {fmtTokens(stats.cachedTokens)} cache reads)</span>
-            </div>
-          </div>
-          <div>
-            <div className="muted text-xs">Cost</div>
-            <div className="mono">
-              {fmtUsd(stats.costUsd, 4)} <span className="muted">· cap {fmtTokens(meta.tokenCap)}</span>
-            </div>
-          </div>
-          <div>
-            <div className="muted text-xs">Budget events</div>
-            <div className="mono">
-              {stats.budgetWarnings} warnings · {stats.budgetExhausted.length} exhausted{stats.cacheHits ? ` · ${stats.cacheHits} dev-cache hits` : ""}
-            </div>
-          </div>
-          <div>
-            <div className="muted text-xs">Run</div>
-            <div className="mono">
-              {stats.agentTurns} agent turns · {fmtSim(stats.simMinutes)} simulated{stats.chaos.length ? ` · chaos: ${stats.chaos.map((c) => c.kind).join(", ")}` : ""}
-            </div>
-          </div>
-        </div>
-        {simulated && (
-          <p className="muted mt-3 text-xs">
-            What is simulated here: {meta.paypalMode === "mock" ? "PayPal calls went to Swarm's in-process mock, which mirrors the Agent Toolkit tool names, schemas and 422 issue codes but is not PayPal. " : ""}
-            {meta.llmMode === "scripted" ? "Agents were scripted (deterministic, zero tokens) rather than LLM-driven. " : ""}
-            Add PayPal sandbox credentials and an OpenRouter key to run the same scenario for real.
+    <>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="type-title">{meta.name}</h1>
+          <p className="type-code-sm text-text-2">
+            agent-readiness report, {meta.scenario}, {id}, generated {new Date(report.generatedAt).toLocaleString()}
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {run && <RunStatus status={run.status} />}
+            <ModeTags modes={meta.paypalMode && meta.llmMode ? { paypal: meta.paypalMode, llm: meta.llmMode } : run?.modes} />
+            <Tag size="sm">{meta.merchantProfile} merchant</Tag>
+            {live && (
+              <Tag size="sm" variant="outline">
+                Live preview
+              </Tag>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <LinkButton href={`/runs/${id}`}>Arena</LinkButton>
+          <LinkButton href={`/runs/${id}/studio`}>Studio</LinkButton>
+          <Button variant="secondary" onClick={() => download("md")}>
+            Download markdown
+          </Button>
+          <Button variant="secondary" onClick={() => download("json")}>
+            Download JSON
+          </Button>
+          <Button pending={busy} pendingLabel="Starting" onClick={() => rerun(otherProfile)}>
+            {otherProfile === "hardened" ? "Re-run with fix" : "Re-run as baseline"}
+          </Button>
+        </div>
+      </div>
+      <ErrorAlert error={error} />
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <Frame variant="panel" aria-label="Readiness score">
+          <FrameHeader>
+            <FrameTitle>Readiness</FrameTitle>
+            <FrameStatus>
+              <Status status={scoreStatus(score.overall)} size="sm">
+                Grade {score.grade}
+              </Status>
+            </FrameStatus>
+            <FrameValue meta>of 100</FrameValue>
+          </FrameHeader>
+          <FrameBody>
+            <p className="type-figure text-text-1" aria-label={`Readiness score ${score.overall} of 100, grade ${score.grade}`}>
+              {score.overall}
+            </p>
+          </FrameBody>
+          <FrameBody>
+            <FrameDescription>Weighted deductions per finding, capped per rule. Rate limits are infrastructure and never score.</FrameDescription>
+          </FrameBody>
+        </Frame>
+
+        <Frame aria-label="Dimensions" className="lg:col-span-2">
+          <FrameHeader>
+            <FrameTitle>Dimensions</FrameTitle>
+            <FrameValue meta>{score.deductions.length} deductions</FrameValue>
+          </FrameHeader>
+          <FrameBody padding="none">
+            <ul>
+              {(Object.keys(DIM_LABEL) as Dimension[]).map((d) => {
+                const v = score.dimensions[d];
+                const ded = score.deductions.filter((x) => x.dimension === d);
+                return (
+                  <li key={d} className="flex flex-col gap-2 rule-row p-inset">
+                    <Meter value={v} max={100} warnAt={null} failAt={null}>
+                      <MeterLabel>{DIM_LABEL[d]}</MeterLabel>
+                      <MeterValue>
+                        {() => (
+                          <span className="inline-flex items-center gap-1.5">
+                            <StatusMark status={scoreStatus(v)} label={scoreStatus(v) === "ok" ? "Good" : scoreStatus(v) === "warn" ? "Weak" : "Failing"} />
+                            {v} / 100
+                          </span>
+                        )}
+                      </MeterValue>
+                    </Meter>
+                    <p className="type-caption text-text-2">{DIM_BLURB[d]}</p>
+                    {ded.length > 0 && <p className="type-code-sm text-text-2">{ded.map((x) => `${x.rule} x${x.count} -${x.points}`).join(", ")}</p>}
+                  </li>
+                );
+              })}
+            </ul>
+          </FrameBody>
+        </Frame>
+      </div>
+
+      <StatusStrip label="Run statistics">
+        <StatusStripCell>
+          <StatusStripLabel>Captured</StatusStripLabel>
+          <StatusStripValue>
+            {stats.captured}
+            <StatusStripUnit>of {stats.ordersCreated} orders</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Shipped</StatusStripLabel>
+          <StatusStripValue>
+            {untracked > 0 && <StatusMark status="warn" />}
+            {stats.shipped}
+            <StatusStripUnit>{untracked > 0 ? `${untracked} untracked` : "all tracked"}</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Declined</StatusStripLabel>
+          <StatusStripValue>
+            {stats.declined}
+            <StatusStripUnit>{stats.refunded} refunded</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Disputes</StatusStripLabel>
+          <StatusStripValue>
+            {stats.disputesOpened > stats.disputesResolved && <StatusMark status="fail" />}
+            {stats.disputesResolved}
+            <StatusStripUnit>of {stats.disputesOpened} resolved</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Webhooks</StatusStripLabel>
+          <StatusStripValue>
+            {stats.webhooks}
+            <StatusStripUnit>median {fmtLag(stats.webhookMedianLagMs)}</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>PayPal errors</StatusStripLabel>
+          <StatusStripValue>
+            {stats.paypalErrors > 0 && <StatusMark status="warn" />}
+            {stats.paypalErrors}
+            <StatusStripUnit>{stats.rateLimits} rate limited</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+      </StatusStrip>
+
+      <Frame aria-label="Findings">
+        <FrameHeader>
+          <FrameTitle>Findings</FrameTitle>
+          <FrameValue meta>{report.findings.length} rules fired</FrameValue>
+        </FrameHeader>
+        <FrameBody padding="none">
+          {ordered.length === 0 ? (
+            <Empty variant="plain">
+              <EmptyIcon />
+              <EmptyHeader>
+                <EmptyTitle>No findings</EmptyTitle>
+                <EmptyDescription>{stats.ordersCreated === 0 ? "No orders were created yet." : "This merchant handled everything the swarm threw at it."}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <CollapsibleGroup variant="plain" multiple>
+              {ordered.map((f, i) => {
+                const trail = f.eventIds.map((eid) => events.get(eid)).filter((e): e is SwarmEvent => !!e);
+                return (
+                  <Collapsible key={`${f.rule}-${i}`} value={`${f.rule}-${i}`}>
+                    <CollapsibleTrigger summary={`${f.eventIds.length} ${f.eventIds.length === 1 ? "event" : "events"}`} summaryStatus={f.severity === "critical" || f.severity === "high" ? "fail" : f.severity === "medium" ? "warn" : undefined}>
+                      <span className="flex min-w-0 flex-wrap items-center gap-2">
+                        <SeverityTag severity={f.severity} />
+                        <span className="min-w-0 type-body-sm normal-case text-text-1">{f.title}</span>
+                        <span className="type-code-sm normal-case text-text-3">{f.rule}</span>
+                        <Tag size="sm" variant="outline">
+                          {DIM_LABEL[f.dimension]}
+                        </Tag>
+                      </span>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="flex flex-col gap-3 p-inset">
+                        <p className="type-body-sm text-text-1">{f.detail}</p>
+                        <p className="type-body-sm text-text-1">
+                          <Status status="ok" size="sm">
+                            Fix
+                          </Status>{" "}
+                          {f.fix}
+                        </p>
+                        {f.paypalIds.length > 0 && <p className="type-code-sm text-text-2">PayPal ids {f.paypalIds.join(", ")}</p>}
+                        {trail.length > 0 ? (
+                          <ol className="flex flex-col border-t border-line-faint">
+                            {trail.map((e) => (
+                              <li key={e.id} className="grid grid-cols-[auto_auto_1fr] gap-x-3 border-b border-line-faint py-1 type-code-sm last:border-b-0">
+                                <span className="text-text-3">#{e.id}</span>
+                                <span className="text-text-3">{fmtSim(e.simT)}</span>
+                                <span className="min-w-0 break-words text-text-1">
+                                  <span className="text-text-2">{e.actor}</span> {e.type} {summarize(e)}
+                                </span>
+                              </li>
+                            ))}
+                          </ol>
+                        ) : (
+                          <p className="type-code-sm text-text-3">events {f.eventIds.join(", ")}</p>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+            </CollapsibleGroup>
+          )}
+        </FrameBody>
+      </Frame>
+
+      <Frame aria-label="Cost and budget">
+        <FrameHeader>
+          <FrameTitle>Cost and budget</FrameTitle>
+          <FrameValue meta>cap {fmtTokens(meta.tokenCap)}</FrameValue>
+        </FrameHeader>
+        <FrameBody padding="none">
+          <DataList className="px-inset">
+            <DataListItem>
+              <DataListLabel>Tokens</DataListLabel>
+              <DataListValue>{`${fmtTokens(stats.tokensIn + stats.tokensOut)} (${fmtTokens(stats.tokensIn)} in, ${fmtTokens(stats.tokensOut)} out, ${fmtTokens(stats.cachedTokens)} cache reads)`}</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>Cost</DataListLabel>
+              <DataListValue>{fmtUsd(stats.costUsd, 4)}</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>GMV</DataListLabel>
+              <DataListValue>{`${fmtUsd(stats.gmvUsd)} captured, ${stats.messages} buyer messages`}</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>Budget events</DataListLabel>
+              <DataListValue>{`${stats.budgetWarnings} warnings, ${stats.budgetExhausted.length} exhausted${stats.cacheHits ? `, ${stats.cacheHits} dev-cache hits` : ""}`}</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>Run</DataListLabel>
+              <DataListValue>{`${stats.agentTurns} agent turns, ${fmtSim(stats.simMinutes)} simulated${stats.chaos.length ? `, chaos ${stats.chaos.map((c) => c.kind).join(" ")}` : ""}`}</DataListValue>
+            </DataListItem>
+          </DataList>
+        </FrameBody>
+        {simulated && (
+          <FrameBody>
+            <FrameDescription>
+              {meta.paypalMode === "mock" ? "PayPal calls went to the in-process mock, which mirrors the Agent Toolkit tool names, schemas and 422 issue codes but is not PayPal. " : ""}
+              {meta.llmMode === "scripted" ? "Agents were scripted, deterministic and token-free, rather than LLM-driven. " : ""}
+              Add PayPal sandbox credentials and an OpenRouter key to run the same scenario for real.
+            </FrameDescription>
+          </FrameBody>
         )}
-      </Section>
-    </div>
+      </Frame>
+    </>
   );
 }

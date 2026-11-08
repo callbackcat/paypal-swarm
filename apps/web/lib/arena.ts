@@ -254,23 +254,3 @@ export function summarize(e: SwarmEvent): string {
       return JSON.stringify(p).slice(0, 160);
   }
 }
-
-export const ACTOR_COLORS: Record<string, string> = {
-  shopper: "var(--info)",
-  merchant: "var(--accent)",
-  chaos: "var(--bad)",
-  analyst: "#c084fc",
-  platform: "var(--muted)",
-  paypal: "var(--accent-2)",
-  human: "var(--ok)",
-};
-
-export const ORDER_STATUS_CLASS: Record<OrderRow["status"], string> = {
-  created: "chip-muted",
-  approved: "chip-info",
-  captured: "chip-ok",
-  shipped: "chip-ok",
-  declined: "chip-bad",
-  refunded: "chip-warn",
-  disputed: "chip-bad",
-};

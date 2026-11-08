@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtSim, subscribe, type Finding, type Report, type RunStatus, type SwarmEvent } from "@/lib/api";
 import { applyEvent, emptyArena, reduceAll, summarize, type ArenaState, type OrderRow } from "@/lib/arena";
 import { swarmAdapter } from "@/lib/studioAdapter";
-import { ErrorBox } from "@/components/ui";
+import { ErrorAlert } from "@/components/ui";
 
 type Row = Record<string, string | number | boolean | null>;
 
@@ -190,25 +190,25 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
     [autoPrompt],
   );
 
-  if (error) return <ErrorBox error={error} />;
-  if (!data) return <div className="muted text-sm">Loading run data…</div>;
+  if (error) return <ErrorAlert error={error} />;
+  if (!data) return <p className="type-body-sm text-text-2">Loading run data.</p>;
   const licenseKey = process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY || undefined;
 
   return (
-    <div className="space-y-2">
-      <div className="muted flex flex-wrap items-center justify-between gap-2 text-xs">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 type-code-sm text-text-2">
         <span>
-          {data.sources.map((s) => `${s.name ?? s.id} ${"data" in s ? s.data.length : "?"}`).join(" · ")}
-          {run?.modes?.llm === "scripted" && !process.env.NEXT_PUBLIC_OPENROUTER_HINT ? " · analyst needs OPENROUTER_API_KEY on the api to think; widgets and prompt starters still work in edit mode" : ""}
+          {data.sources.map((s) => `${s.name ?? s.id} ${"data" in s ? s.data.length : "?"}`).join(", ")}
+          {run?.modes?.llm === "scripted" && !process.env.NEXT_PUBLIC_OPENROUTER_HINT ? "; the analyst needs OPENROUTER_API_KEY on the api to think, widgets and prompt starters still work in edit mode" : ""}
         </span>
-        <span className="mono">
-          studio turns {usage.turns} · {usage.tokens} tokens · ${usage.costUsd.toFixed(4)}
-          {!licenseKey ? " · trial (set NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY)" : ""}
+        <span>
+          studio turns {usage.turns}, {usage.tokens} tokens, ${usage.costUsd.toFixed(4)}
+          {!licenseKey ? ", trial (set NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY)" : ""}
         </span>
       </div>
-      <div className="ag-studio-host panel overflow-hidden">
+      <div className="ag-studio-host frame overflow-hidden">
         <AgStudioProvider modules={[AgStudioAiModule]} licenseKey={licenseKey}>
-          <AgStudio mode="edit" data={data} ai={ai} onStudioReady={onStudioReady} style={{ height: "100%", width: "100%" }} />
+          <AgStudio mode="edit" data={data} ai={ai} onStudioReady={onStudioReady} />
         </AgStudioProvider>
       </div>
     </div>

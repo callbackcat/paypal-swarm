@@ -2,28 +2,52 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, fmtLag, fmtSim, fmtTokens, fmtUsd, isTerminal, subscribe, type RunStatus, type SwarmEvent } from "@/lib/api";
-import { ACTOR_COLORS, ORDER_STATUS_CLASS, applyEvent, emptyArena, summarize, type ArenaState } from "@/lib/arena";
-import { Bar, Chip, Empty, ErrorBox, ModeBadges, Section, Stat, StatusChip } from "@/components/ui";
+import { api, fmtLag, fmtSim, fmtTokens, fmtUsd, isTerminal, subscribe, type RunStatus as RunStatusView, type SwarmEvent } from "@/lib/api";
+import { applyEvent, emptyArena, summarize, type ArenaState } from "@/lib/arena";
+import { ErrorAlert, LinkButton, ModeTags, OrderStatusTag, RunStatus } from "@/components/ui";
+import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/sodium/ui/alert";
+import { Button } from "@/components/sodium/ui/button";
+import { DataList, DataListItem, DataListLabel, DataListValue } from "@/components/sodium/ui/data-list";
+import { Frame, FrameBody, FrameDescription, FrameHeader, FrameStatus, FrameTitle, FrameValue } from "@/components/sodium/ui/frame";
+import { LogViewer, type LogLevel, type LogLine } from "@/components/sodium/ui/log-viewer";
+import { Meter, MeterLabel, MeterValue } from "@/components/sodium/ui/meter";
+import { SegmentedControl, SegmentedControlItem } from "@/components/sodium/ui/segmented-control";
+import { Status, StatusMark } from "@/components/sodium/ui/status";
+import { StatusStrip, StatusStripCell, StatusStripLabel, StatusStripUnit, StatusStripValue } from "@/components/sodium/ui/status-strip";
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from "@/components/sodium/ui/table";
+import { Tag } from "@/components/sodium/ui/tag";
 
 const CLASSES = ["shopper", "merchant", "chaos", "paypal", "analyst", "platform", "human"] as const;
 const NOISY = new Set(["tool.call", "tool.result", "agent.turn"]);
+const FAIL = new Set(["paypal.error", "order.capture_declined", "dispute.opened", "budget.exhausted", "run.failed"]);
+const WARN = new Set(["approval.requested", "budget.warning", "infra.rate_limit", "chaos.injected", "approval.denied"]);
+
+function levelOf(e: SwarmEvent): LogLevel {
+  if (FAIL.has(e.type)) return "fail";
+  if (WARN.has(e.type)) return "warn";
+  if (NOISY.has(e.type)) return "debug";
+  return "info";
+}
+
+const toLine = (e: SwarmEvent, i: number): LogLine => ({
+  id: e.id ?? `t${e.t}-${i}`,
+  time: fmtSim(e.simT),
+  level: levelOf(e),
+  source: e.actor,
+  message: `${e.type} ${summarize(e)}${e.paypalIds.length ? ` [${e.paypalIds.slice(0, 2).join(", ")}]` : ""}`,
+});
 
 export default function ArenaPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [run, setRun] = useState<RunStatus | null>(null);
+  const [run, setRun] = useState<RunStatusView | null>(null);
   const [state, setState] = useState<ArenaState>(emptyArena);
   const stateRef = useRef(state);
   const [error, setError] = useState<unknown>(null);
   const [connected, setConnected] = useState(false);
   const [done, setDone] = useState(false);
-  const [filter, setFilter] = useState<Set<string>>(new Set(CLASSES));
-  const [showNoisy, setShowNoisy] = useState(false);
-  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<string[]>([...CLASSES]);
   const [busy, setBusy] = useState<string | null>(null);
-  const feedRef = useRef<HTMLDivElement>(null);
-  const [autoScroll, setAutoScroll] = useState(true);
 
   const refresh = useCallback(() => api.getRun(id).then(setRun).catch(setError), [id]);
 
@@ -61,21 +85,27 @@ export default function ArenaPage() {
     };
   }, [id, refresh]);
 
-  useEffect(() => {
-    if (autoScroll && feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight;
-  }, [state.total, autoScroll]);
-
-  const feed = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return state.feed.filter((e) => filter.has(e.actorClass) && (showNoisy || !NOISY.has(e.type)) && (!q || summarize(e).toLowerCase().includes(q) || e.actor.toLowerCase().includes(q) || e.type.includes(q) || e.paypalIds.some((p) => p.toLowerCase().includes(q))));
-  }, [state.feed, filter, showNoisy, query]);
+  const filterSet = useMemo(() => new Set(filter), [filter]);
+  const lines = useMemo(() => state.feed.filter((e) => filterSet.has(e.actorClass)).map(toLine), [state.feed, filterSet]);
+  const classCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const e of state.feed) c[e.actorClass] = (c[e.actorClass] ?? 0) + 1;
+    return c;
+  }, [state.feed]);
 
   const orders = useMemo(() => [...state.orders.values()].sort((a, b) => b.lastEventId - a.lastEventId), [state.orders]);
   const pending = useMemo(() => [...state.approvals.values()].filter((a) => a.status === "pending"), [state.approvals]);
+  const decided = useMemo(() => [...state.approvals.values()].filter((a) => a.status !== "pending"), [state.approvals]);
   const finished = done || (run ? isTerminal(run.status) : false);
   const cap = run?.tokenCap ?? Number(state.started?.tokenCap ?? 0);
   const tokens = run?.budget?.total ?? state.budget.tokensIn + state.budget.tokensOut;
   const cost = run?.budget?.costUsd ?? state.budget.costUsd;
+  const captured = orders.filter((o) => o.status === "captured" || o.status === "shipped").length;
+  const shipped = orders.filter((o) => o.status === "shipped").length;
+  const declined = orders.filter((o) => o.status === "declined").length;
+  const lagMedian = median(state.webhooks.map((w) => w.lagMs).filter((x): x is number => x !== null));
+  const otherProfile = run?.merchantProfile === "hardened" ? "baseline" : "hardened";
+  const finishReason = String(state.finished?.reason ?? run?.score?.reason ?? "");
 
   async function act(name: "pause" | "resume" | "stop") {
     setBusy(name);
@@ -89,7 +119,7 @@ export default function ArenaPage() {
     }
   }
   async function decide(approvalId: string, decision: "granted" | "denied") {
-    setBusy(approvalId);
+    setBusy(approvalId + decision);
     try {
       await api.decide(id, approvalId, decision);
       await refresh();
@@ -102,7 +132,7 @@ export default function ArenaPage() {
   async function rerun() {
     setBusy("rerun");
     try {
-      const r = await api.rerun(id, { merchantProfile: run?.merchantProfile === "hardened" ? "baseline" : "hardened" });
+      const r = await api.rerun(id, { merchantProfile: otherProfile });
       router.push(`/runs/${r.id}`);
     } catch (e) {
       setError(e);
@@ -110,289 +140,370 @@ export default function ArenaPage() {
     }
   }
 
+  if (!run && error && state.total === 0) {
+    return (
+      <>
+        <h1 className="type-title">Run</h1>
+        <p className="type-code-sm text-text-2">{id}</p>
+        <ErrorAlert error={error} />
+      </>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="type-title">{run?.name ?? "Run"}</h1>
+          <p className="type-code-sm text-text-2">
+            {id}, sim clock {fmtSim(state.simT)}, {state.total} events
+            {state.started ? `, ${String(state.started.shoppers)} shoppers, catalog ${String(state.started.catalogSize)}` : ""}
+          </p>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold tracking-tight">{run?.name ?? "Run"}</h1>
-            {run && <StatusChip status={run.paused ? "paused" : run.status} />}
-            <ModeBadges modes={run?.modes ?? (state.started ? { paypal: String(state.started.paypalMode) as "mock", llm: String(state.started.llmMode) as "scripted" } : null)} compact />
-            <Chip tone="muted">{run?.merchantProfile ?? "…"} merchant</Chip>
+            {run && <RunStatus status={run.status} paused={run.paused} live />}
+            <ModeTags modes={run?.modes ?? (state.started ? { paypal: String(state.started.paypalMode) as "mock", llm: String(state.started.llmMode) as "scripted" } : null)} />
+            {run && <Tag size="sm">{run.merchantProfile} merchant</Tag>}
             {connected && !finished && (
-              <Chip tone="ok">
-                <span className="live-dot mr-1.5" />
-                live
-              </Chip>
+              <Tag size="sm" variant="outline">
+                Live feed
+              </Tag>
             )}
-          </div>
-          <div className="muted mono mt-1 text-xs">
-            {id} · sim clock {fmtSim(state.simT)} · {state.total} events{state.started ? ` · ${String(state.started.shoppers)} shoppers · catalog ${String(state.started.catalogSize)}` : ""}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {!finished &&
+            (run?.paused ? (
+              <Button variant="secondary" pending={busy === "resume"} pendingLabel="Resuming" disabled={busy !== null} onClick={() => act("resume")}>
+                Resume run
+              </Button>
+            ) : (
+              <Button variant="secondary" pending={busy === "pause"} pendingLabel="Pausing" disabled={busy !== null || !run?.active} onClick={() => act("pause")}>
+                Pause run
+              </Button>
+            ))}
+          <LinkButton href={`/runs/${id}/studio`}>Studio</LinkButton>
+          <LinkButton href={`/runs/${id}/report`}>{finished ? "Report" : "Live report"}</LinkButton>
           {!finished && (
-            <>
-              {run?.paused ? (
-                <button className="btn" disabled={busy !== null} onClick={() => act("resume")}>
-                  ▶ Resume
-                </button>
-              ) : (
-                <button className="btn" disabled={busy !== null || !run?.active} onClick={() => act("pause")}>
-                  ❚❚ Pause
-                </button>
-              )}
-              <button className="btn btn-danger" disabled={busy !== null || !run?.active} onClick={() => act("stop")}>
-                ■ Stop
-              </button>
-            </>
+            <Button variant="destructive" pending={busy === "stop"} pendingLabel="Stopping" disabled={busy !== null || !run?.active} onClick={() => act("stop")}>
+              Stop run
+            </Button>
           )}
-          <Link href={`/runs/${id}/studio`} className="btn">
-            Studio
-          </Link>
-          <Link href={`/runs/${id}/report`} className={`btn ${finished ? "btn-primary" : ""}`}>
-            Report {finished ? "→" : "(live)"}
-          </Link>
         </div>
-      </header>
-      <ErrorBox error={error} />
+      </div>
+      <ErrorAlert error={error} />
 
       {finished && (
-        <div className="panel flex flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderColor: "var(--accent)" }}>
-          <div className="text-sm">
-            <span className="font-medium">Run finished</span>
-            {state.finished && <span className="muted"> · reason {String(state.finished.reason)} · {String(state.finished.orders)} orders · {fmtTokens(Number(state.finished.tokens))} tokens · {fmtUsd(Number(state.finished.costUsd), 3)}</span>}
-            {run?.score?.score && (
-              <span className="ml-2">
-                score <span className="mono font-semibold">{run.score.score.overall}</span> ({run.score.score.grade})
-              </span>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <button className="btn" disabled={busy !== null} onClick={rerun}>
-              Re-run with {run?.merchantProfile === "hardened" ? "baseline" : "hardened fix"}
-            </button>
-            <Link href={`/runs/${id}/report`} className="btn btn-primary">
+        <Alert status={finishReason === "budget" ? "warn" : run?.status === "failed" ? "fail" : "ok"}>
+          <AlertTitle>{finishReason === "budget" ? "Run stopped at the token cap" : run?.status === "failed" ? "Run failed" : run?.status === "stopped" ? "Run stopped" : "Run finished"}</AlertTitle>
+          <AlertDescription>
+            {state.finished
+              ? `Finished (${finishReason}) with ${String(state.finished.orders)} orders, ${fmtTokens(Number(state.finished.tokens))} tokens and ${fmtUsd(Number(state.finished.costUsd), 3)}${run?.score?.score ? `; readiness score ${run.score.score.overall}, grade ${run.score.score.grade}` : ""}.`
+              : run?.score?.error
+                ? `The run failed: ${run.score.error}`
+                : "The run has finished."}
+          </AlertDescription>
+          <AlertAction>
+            <Button variant="secondary" size="sm" pending={busy === "rerun"} pendingLabel="Starting" disabled={busy !== null} onClick={rerun}>
+              Re-run {otherProfile}
+            </Button>
+            <LinkButton href={`/runs/${id}/report`} variant="primary" size="sm">
               Open report
-            </Link>
-          </div>
-        </div>
+            </LinkButton>
+          </AlertAction>
+        </Alert>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat label="Orders" value={orders.length} sub={`${orders.filter((o) => o.status === "captured" || o.status === "shipped").length} captured · ${orders.filter((o) => o.status === "shipped").length} shipped`} />
-        <Stat label="Declined / refunds / disputes" value={`${orders.filter((o) => o.status === "declined").length} / ${state.counts.refunds} / ${state.counts.disputes}`} tone={state.counts.disputes ? "bad" : undefined} />
-        <Stat label="PayPal errors" value={state.counts.errors} sub={state.counts.rateLimits ? `${state.counts.rateLimits} rate limits (not scored)` : "429s excluded from score"} tone={state.counts.errors ? "warn" : undefined} />
-        <Stat label="Webhooks" value={state.webhooks.length} sub={state.webhooks.length ? `median lag ${fmtLag(median(state.webhooks.map((w) => w.lagMs).filter((x): x is number => x !== null)))}` : "none yet"} />
-        <Stat label="Agent turns" value={state.counts.turns} sub={`${state.counts.toolCalls} tool calls · ${state.counts.messages} messages`} />
-        <Stat label="Pending approvals" value={pending.length} tone={pending.length ? "warn" : undefined} sub={pending.length ? "merchant is waiting on you" : "none"} />
-      </div>
+      <StatusStrip label="Run status">
+        <StatusStripCell>
+          <StatusStripLabel>Orders</StatusStripLabel>
+          <StatusStripValue>
+            {orders.length}
+            <StatusStripUnit>created</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Captured</StatusStripLabel>
+          <StatusStripValue>
+            {captured}
+            <StatusStripUnit>{shipped} shipped</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Declined</StatusStripLabel>
+          <StatusStripValue>
+            {declined > 0 && <StatusMark status="fail" />}
+            {declined}
+            <StatusStripUnit>{state.counts.refunds} refunded</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Disputes</StatusStripLabel>
+          <StatusStripValue>
+            {state.counts.disputes > 0 && <StatusMark status="fail" />}
+            {state.counts.disputes}
+            <StatusStripUnit>open</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>PayPal errors</StatusStripLabel>
+          <StatusStripValue>
+            {state.counts.errors > 0 && <StatusMark status="warn" />}
+            {state.counts.errors}
+            <StatusStripUnit>{state.counts.rateLimits} rate limited</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+        <StatusStripCell>
+          <StatusStripLabel>Webhooks</StatusStripLabel>
+          <StatusStripValue>
+            {state.webhooks.length}
+            <StatusStripUnit>{state.webhooks.length ? `median ${fmtLag(lagMedian)}` : "none yet"}</StatusStripUnit>
+          </StatusStripValue>
+        </StatusStripCell>
+      </StatusStrip>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_320px]">
-        <Section title={`Order board (${orders.length})`} bodyClass="p-0 max-h-[640px] overflow-auto scroll-thin">
-          {orders.length === 0 ? (
-            <Empty>Shoppers are browsing…</Empty>
-          ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Shopper</th>
-                  <th>Order</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Timeline (sim)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => (
-                  <tr key={o.orderId}>
-                    <td>
-                      <div className="truncate" style={{ maxWidth: 140 }}>
-                        {o.personaName}
-                      </div>
-                      <div className="mono muted text-[11px]">{o.personaId}</div>
-                    </td>
-                    <td className="mono text-xs" title={o.orderId}>
-                      {o.orderId.slice(0, 8)}…{o.captureId && <div className="muted">cap {o.captureId.slice(0, 6)}…</div>}
-                      {o.trackingNumber && <div className="muted">trk {o.trackingNumber.slice(0, 10)}</div>}
-                    </td>
-                    <td className="mono">
-                      ${o.amount.toFixed(2)}
-                      {o.refunded > 0 && <div style={{ color: "var(--warn)" }}>−${o.refunded.toFixed(2)}</div>}
-                    </td>
-                    <td>
-                      <span className={`chip ${ORDER_STATUS_CLASS[o.status]}`}>{o.status}</span>
-                      {o.declineReason && <div className="mono text-[11px]" style={{ color: "var(--bad)" }}>{o.declineReason}</div>}
-                      {o.disputeIds.length > 0 && <div className="mono text-[11px]" style={{ color: "var(--bad)" }}>{o.disputeIds.length} dispute</div>}
-                      {o.errors > 0 && <div className="text-[11px]" style={{ color: "var(--warn)" }}>{o.errors} PayPal errors</div>}
-                    </td>
-                    <td className="mono muted text-[11px]">
-                      <div>created {fmtSim(o.createdSimT)}</div>
-                      {o.capturedSimT !== undefined && <div>captured {fmtSim(o.capturedSimT)}</div>}
-                      {o.shippedSimT !== undefined && <div style={{ color: "var(--ok)" }}>shipped {fmtSim(o.shippedSimT)}</div>}
-                      {o.capturedSimT !== undefined && o.shippedSimT === undefined && state.simT - o.capturedSimT > 240 && <div style={{ color: "var(--warn)" }}>no tracking for {fmtSim(state.simT - o.capturedSimT)}</div>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Section>
-
-        <Section
-          title={`Live feed (${feed.length}${feed.length !== state.feed.length ? ` of ${state.feed.length}` : ""})`}
-          right={
-            <div className="flex items-center gap-1">
-              <input className="input py-1 text-xs" style={{ width: 150 }} placeholder="search ids, text…" value={query} onChange={(e) => setQuery(e.target.value)} />
-              <button className={`chip ${showNoisy ? "chip-accent" : "chip-muted"}`} onClick={() => setShowNoisy((v) => !v)} title="Show tool calls and agent turns">
-                tools
-              </button>
-              <button className={`chip ${autoScroll ? "chip-accent" : "chip-muted"}`} onClick={() => setAutoScroll((v) => !v)}>
-                follow
-              </button>
-            </div>
-          }
-          bodyClass="p-0"
-        >
-          <div className="flex flex-wrap gap-1 px-3 py-2" style={{ borderBottom: "1px solid var(--line)" }}>
-            {CLASSES.map((c) => (
-              <button
-                key={c}
-                className="chip"
-                style={{ color: filter.has(c) ? ACTOR_COLORS[c] : "var(--muted)", borderColor: filter.has(c) ? ACTOR_COLORS[c] : undefined, opacity: filter.has(c) ? 1 : 0.5 }}
-                onClick={() =>
-                  setFilter((f) => {
-                    const n = new Set(f);
-                    if (n.has(c)) n.delete(c);
-                    else n.add(c);
-                    return n;
-                  })
-                }
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-          <div ref={feedRef} className="max-h-[600px] overflow-auto scroll-thin" onScroll={(e) => setAutoScroll(e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 40)}>
-            {feed.length === 0 && <Empty>Waiting for events…</Empty>}
-            {feed.map((e) => (
-              <FeedRow key={e.id ?? `${e.t}-${e.type}`} e={e} />
-            ))}
-          </div>
-        </Section>
-
-        <div className="space-y-4">
-          <Section title="Token budget">
-            <div className="flex items-end justify-between text-sm">
-              <span className="mono text-lg font-semibold">{fmtTokens(tokens)}</span>
-              <span className="muted text-xs">cap {fmtTokens(cap)}</span>
-            </div>
-            <div className="mt-2">
-              <Bar value={tokens} max={cap || 1} tone={cap && tokens / cap > 0.8 ? "warn" : "ok"} />
-            </div>
-            <div className="muted mt-2 flex justify-between text-xs">
-              <span>in {fmtTokens(run?.budget?.tokensIn ?? state.budget.tokensIn)} · out {fmtTokens(run?.budget?.tokensOut ?? state.budget.tokensOut)}</span>
-              <span className="mono">{fmtUsd(cost, 3)}</span>
-            </div>
-            {state.budget.cached > 0 && <div className="muted text-xs">cache reads {fmtTokens(state.budget.cached)}</div>}
-            {state.budget.warnings > 0 && <div className="mt-1 text-xs" style={{ color: "var(--warn)" }}>80 % reached: no new shoppers admitted</div>}
-            {state.budget.exhausted.length > 0 && <div className="mt-1 text-xs" style={{ color: "var(--bad)" }}>exhausted: {state.budget.exhausted.join(", ")}</div>}
-            {tokens === 0 && <div className="muted mt-1 text-xs">Scripted agents: zero tokens spent.</div>}
-          </Section>
-
-          <Section title={`Approvals${pending.length ? ` (${pending.length} pending)` : ""}`}>
-            {pending.length === 0 && <div className="muted text-xs">Refunds above the threshold and dispute concessions pause here until you decide. Timeouts count as denied.</div>}
-            <ul className="space-y-2">
-              {pending.map((a) => (
-                <li key={a.id} className="panel-2 p-2 text-xs">
-                  <div className="font-medium">{a.kind.replace(/_/g, " ")}</div>
-                  <div className="muted mono mt-0.5 break-all">
-                    {Object.entries(a.payload)
-                      .filter(([k]) => !["approvalId", "kind"].includes(k))
-                      .map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
-                      .join(" · ")
-                      .slice(0, 220)}
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button className="btn btn-primary py-1 text-xs" disabled={busy !== null} onClick={() => decide(a.id, "granted")}>
-                      Approve
-                    </button>
-                    <button className="btn btn-danger py-1 text-xs" disabled={busy !== null} onClick={() => decide(a.id, "denied")}>
-                      Deny
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {[...state.approvals.values()].filter((a) => a.status !== "pending").length > 0 && (
-              <div className="muted mt-2 text-[11px]">
-                decided: {[...state.approvals.values()].filter((a) => a.status !== "pending").map((a) => `${a.kind} ${a.status}`).join(" · ")}
-              </div>
-            )}
-          </Section>
-
-          <Section title="Webhook ticker" bodyClass="p-0 max-h-56 overflow-auto scroll-thin">
-            {state.webhooks.length === 0 ? (
-              <Empty>No webhooks yet{run?.modes?.paypal === "sandbox" ? " (register the api URL in the PayPal dashboard)" : ""}</Empty>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <Table size="sm" title="Orders" count={orders.length} stickyHeader maxHeight={640}>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Shopper</TableHead>
+              <TableHead>Order</TableHead>
+              <TableHead numeric>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Timeline</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orders.length === 0 ? (
+              <TableEmpty colSpan={5} title={finished ? "No orders in this run" : "Shoppers are browsing"} description={finished ? "Nothing reached checkout." : "The first order lands here as soon as a shopper checks out."} />
             ) : (
-              <ul className="text-xs">
-                {[...state.webhooks].reverse().slice(0, 40).map((w) => (
-                  <li key={w.id} className="feed-row flex items-center justify-between gap-2 px-3 py-1.5">
-                    <span className="mono truncate">{w.eventType}</span>
-                    <span className="muted mono whitespace-nowrap">
-                      {fmtLag(w.lagMs)}
-                      {w.verified ? " ✓" : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              orders.map((o) => (
+                <TableRow key={o.orderId}>
+                  <TableCell>
+                    <div className="flex flex-col">
+                      <span>{o.personaName}</span>
+                      <span className="type-code-sm text-text-3">{o.personaId}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell mono title={o.orderId}>
+                    <div className="flex flex-col">
+                      <span>{o.orderId.slice(0, 8)}</span>
+                      {o.captureId && <span className="text-text-3">cap {o.captureId.slice(0, 6)}</span>}
+                      {o.trackingNumber && <span className="text-text-3">trk {o.trackingNumber.slice(0, 10)}</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell numeric>
+                    <div className="flex flex-col items-end">
+                      <span>${o.amount.toFixed(2)}</span>
+                      {o.refunded > 0 && <span className="text-text-3">refunded ${o.refunded.toFixed(2)}</span>}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <OrderStatusTag status={o.status} />
+                      {o.declineReason && (
+                        <Tag size="sm" variant="fail">
+                          {o.declineReason}
+                        </Tag>
+                      )}
+                      {o.disputeIds.length > 0 && <Tag size="sm" variant="fail" count={o.disputeIds.length} title={`${o.disputeIds.length} disputes`} />}
+                      {o.errors > 0 && (
+                        <Tag size="sm" variant="warn">
+                          {o.errors} errors
+                        </Tag>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell mono>
+                    <div className="flex flex-col text-text-2">
+                      <span>created {fmtSim(o.createdSimT)}</span>
+                      {o.capturedSimT !== undefined && <span>captured {fmtSim(o.capturedSimT)}</span>}
+                      {o.shippedSimT !== undefined && <span>shipped {fmtSim(o.shippedSimT)}</span>}
+                      {o.capturedSimT !== undefined && o.shippedSimT === undefined && state.simT - o.capturedSimT > 240 && <span className="text-warn-text">no tracking for {fmtSim(state.simT - o.capturedSimT)}</span>}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
-          </Section>
+          </TableBody>
+        </Table>
 
-          {(state.chaos.length > 0 || state.insights.length > 0) && (
-            <Section title="Chaos & insights">
-              <div className="flex flex-wrap gap-1">
-                {state.chaos.map((c) => (
-                  <Chip key={c.id} tone="bad" title={JSON.stringify(c.payload).slice(0, 200)}>
-                    ⚡ {c.kind} @ {fmtSim(c.simT)}
-                  </Chip>
-                ))}
-              </div>
-              {state.insights.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {state.insights.map((i) => (
-                    <li key={i.key}>
-                      <Link href={`/runs/${id}/studio?prompt=${encodeURIComponent(i.prompt)}`} className="chip chip-info hover:opacity-80" title={i.prompt}>
-                        ✦ {i.title} → Studio
-                      </Link>
+        <div className="flex flex-col gap-3">
+          <SegmentedControl multiple size="sm" value={filter} onValueChange={(v) => setFilter(v as string[])} aria-label="Actors in the feed">
+            {CLASSES.map((c) => (
+              <SegmentedControlItem key={c} value={c} count={classCounts[c] ?? 0}>
+                {c}
+              </SegmentedControlItem>
+            ))}
+          </SegmentedControl>
+          <LogViewer label="Event feed" name={run?.name ?? id} lines={lines} streaming={!finished} toolbar height={560} />
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <Frame aria-label="Token budget">
+            <FrameHeader>
+              <FrameTitle>Token budget</FrameTitle>
+              <FrameValue meta>{fmtUsd(cost, 3)}</FrameValue>
+            </FrameHeader>
+            <FrameBody>
+              <Meter value={tokens} max={cap || 1} warnAt={0.8} failAt={1} statusLabel={tokens / (cap || 1) >= 1 ? "Exhausted" : "Admission stopped"}>
+                <MeterLabel>Tokens</MeterLabel>
+                <MeterValue>{() => `${fmtTokens(tokens)} / ${fmtTokens(cap)}`}</MeterValue>
+              </Meter>
+            </FrameBody>
+            <FrameBody padding="none">
+              <DataList className="px-inset">
+                <DataListItem>
+                  <DataListLabel>Input</DataListLabel>
+                  <DataListValue>{fmtTokens(run?.budget?.tokensIn ?? state.budget.tokensIn)}</DataListValue>
+                </DataListItem>
+                <DataListItem>
+                  <DataListLabel>Output</DataListLabel>
+                  <DataListValue>{fmtTokens(run?.budget?.tokensOut ?? state.budget.tokensOut)}</DataListValue>
+                </DataListItem>
+                <DataListItem>
+                  <DataListLabel>Cache reads</DataListLabel>
+                  <DataListValue>{state.budget.cached > 0 ? fmtTokens(state.budget.cached) : null}</DataListValue>
+                </DataListItem>
+                <DataListItem>
+                  <DataListLabel>Exhausted</DataListLabel>
+                  <DataListValue>{state.budget.exhausted.length ? state.budget.exhausted.join(", ") : null}</DataListValue>
+                </DataListItem>
+              </DataList>
+            </FrameBody>
+            {tokens === 0 && (
+              <FrameBody>
+                <FrameDescription>Scripted agents: zero tokens spent.</FrameDescription>
+              </FrameBody>
+            )}
+          </Frame>
+
+          <Frame aria-label="Approvals">
+            <FrameHeader>
+              <FrameTitle>Approvals</FrameTitle>
+              {pending.length > 0 && (
+                <FrameStatus>
+                  <Status status="warn" size="sm">
+                    {pending.length} pending
+                  </Status>
+                </FrameStatus>
+              )}
+              <FrameValue meta>{decided.length} decided</FrameValue>
+            </FrameHeader>
+            {pending.length === 0 ? (
+              <FrameBody>
+                <FrameDescription>Refunds above the threshold and dispute concessions pause here until you decide. Timeouts count as denied.</FrameDescription>
+              </FrameBody>
+            ) : (
+              <FrameBody padding="none">
+                <ul>
+                  {pending.map((a, i) => (
+                    <li key={a.id} className="flex flex-col gap-2 rule-row p-inset">
+                      <span className="type-label-sm text-text-1">{a.kind.replace(/_/g, " ")}</span>
+                      <span className="break-all type-code-sm text-text-2">
+                        {Object.entries(a.payload)
+                          .filter(([k]) => !["approvalId", "kind"].includes(k))
+                          .map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+                          .join(" ")
+                          .slice(0, 220)}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button variant="secondary" size="sm" pending={busy === a.id + "denied"} pendingLabel="Denying" disabled={busy !== null} onClick={() => decide(a.id, "denied")}>
+                          Deny
+                        </Button>
+                        <Button variant={i === 0 ? "primary" : "secondary"} size="sm" pending={busy === a.id + "granted"} pendingLabel="Approving" disabled={busy !== null} onClick={() => decide(a.id, "granted")}>
+                          Approve
+                        </Button>
+                      </div>
                     </li>
                   ))}
                 </ul>
+              </FrameBody>
+            )}
+            {decided.length > 0 && (
+              <FrameBody>
+                <p className="type-code-sm text-text-2">{decided.map((a) => `${a.kind} ${a.status}`).join(", ")}</p>
+              </FrameBody>
+            )}
+          </Frame>
+
+          <Table size="sm" title="Webhooks" count={state.webhooks.length} stickyHeader maxHeight={224}>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Event</TableHead>
+                <TableHead numeric>Lag</TableHead>
+                <TableHead>Verified</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {state.webhooks.length === 0 ? (
+                <TableEmpty colSpan={3} title="No webhooks yet" description={run?.modes?.paypal === "sandbox" ? "Register the api URL in the PayPal dashboard to receive them." : "The mock does not send webhooks; sandbox runs do."} />
+              ) : (
+                [...state.webhooks]
+                  .reverse()
+                  .slice(0, 40)
+                  .map((w) => (
+                    <TableRow key={w.id}>
+                      <TableCell mono>{w.eventType}</TableCell>
+                      <TableCell numeric>{fmtLag(w.lagMs)}</TableCell>
+                      <TableCell>
+                        {w.verified ? (
+                          <Tag size="sm" variant="ok">
+                            Verified
+                          </Tag>
+                        ) : (
+                          <Tag size="sm" variant="outline">
+                            Unverified
+                          </Tag>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
               )}
-            </Section>
+            </TableBody>
+          </Table>
+
+          {(state.chaos.length > 0 || state.insights.length > 0) && (
+            <Frame aria-label="Chaos and insights">
+              <FrameHeader>
+                <FrameTitle>Chaos and insights</FrameTitle>
+                <FrameValue meta>
+                  {state.chaos.length} injected, {state.insights.length} insights
+                </FrameValue>
+              </FrameHeader>
+              {state.chaos.length > 0 && (
+                <FrameBody>
+                  <ul className="flex flex-wrap gap-1">
+                    {state.chaos.map((c) => (
+                      <li key={c.id}>
+                        <Tag size="sm" variant="fail" title={JSON.stringify(c.payload).slice(0, 200)}>
+                          {c.kind.replace(/_/g, " ")} {fmtSim(c.simT)}
+                        </Tag>
+                      </li>
+                    ))}
+                  </ul>
+                </FrameBody>
+              )}
+              {state.insights.length > 0 && (
+                <FrameBody padding="none">
+                  <ul>
+                    {state.insights.map((i) => (
+                      <li key={i.key} className="flex min-h-(--row) flex-wrap items-center justify-between gap-x-3 gap-y-1 rule-row px-inset py-1.5">
+                        <span className="min-w-0 flex-1 type-body-sm text-text-1" title={i.prompt}>
+                          {i.title}
+                        </span>
+                        <Button variant="ghost" size="sm" render={<Link href={`/runs/${id}/studio?prompt=${encodeURIComponent(i.prompt)}`} />} nativeButton={false}>
+                          Open in Studio
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </FrameBody>
+              )}
+            </Frame>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function FeedRow({ e }: { e: SwarmEvent }) {
-  const color = ACTOR_COLORS[e.actorClass] ?? "var(--muted)";
-  const bad = e.type === "paypal.error" || e.type === "order.capture_declined" || e.type === "dispute.opened" || e.type === "budget.exhausted";
-  const warn = e.type === "approval.requested" || e.type === "budget.warning" || e.type === "infra.rate_limit" || e.type === "chaos.injected";
-  return (
-    <div className="feed-row grid grid-cols-[52px_96px_1fr] gap-2 px-3 py-1.5 text-xs" style={{ background: bad ? "color-mix(in srgb, var(--bad) 7%, transparent)" : warn ? "color-mix(in srgb, var(--warn) 6%, transparent)" : undefined }}>
-      <span className="mono muted">{fmtSim(e.simT)}</span>
-      <span className="truncate font-medium" style={{ color }} title={e.actor}>
-        {e.actor}
-      </span>
-      <span>
-        <span className="mono muted mr-1.5">{e.type}</span>
-        <span className="break-words">{summarize(e)}</span>
-        {e.paypalIds.length > 0 && <span className="mono muted ml-1.5 text-[10px]">[{e.paypalIds.slice(0, 2).join(", ")}]</span>}
-      </span>
-    </div>
+    </>
   );
 }
 

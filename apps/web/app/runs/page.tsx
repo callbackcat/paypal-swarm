@@ -2,84 +2,98 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, fmtTokens, fmtUsd, type RunListItem } from "@/lib/api";
-import { ErrorBox, ModeBadges, StatusChip } from "@/components/ui";
+import { ErrorAlert, LinkButton, ModeTags, RunStatus } from "@/components/ui";
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableLoading, TableRow } from "@/components/sodium/ui/table";
+
+const COLUMNS = 9;
 
 export default function RunsPage() {
   const [runs, setRuns] = useState<RunListItem[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   useEffect(() => {
-    const load = () => api.listRuns().then((r) => setRuns(r.runs)).catch(setError);
+    const load = () =>
+      api
+        .listRuns()
+        .then((r) => {
+          setRuns(r.runs);
+          setError(null);
+        })
+        .catch((e) => {
+          setError(e);
+          setRuns((prev) => prev ?? []);
+        });
     load();
     const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, []);
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Runs</h1>
-        <Link href="/" className="btn btn-primary">
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="type-title">Runs</h1>
+        <LinkButton href="/" variant="primary">
           New run
-        </Link>
+        </LinkButton>
       </div>
-      <ErrorBox error={error} />
-      <div className="panel overflow-x-auto">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Run</th>
-              <th>Scenario</th>
-              <th>Merchant</th>
-              <th>Modes</th>
-              <th>Status</th>
-              <th>Score</th>
-              <th>Tokens</th>
-              <th>Cost</th>
-              <th>Created</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(runs ?? []).map((r) => (
-              <tr key={r.id}>
-                <td>
-                  <Link href={`/runs/${r.id}`} className="hover:underline">
-                    {r.name}
-                  </Link>
-                  <div className="mono muted text-[11px]">{r.id}</div>
-                </td>
-                <td>{r.scenario}</td>
-                <td>{r.merchantProfile}</td>
-                <td>
-                  <ModeBadges modes={r.score?.modes ?? null} compact />
-                </td>
-                <td>
-                  <StatusChip status={r.status} />
-                </td>
-                <td className="mono">{r.score?.score ? `${r.score.score.overall} (${r.score.score.grade})` : "–"}</td>
-                <td className="mono">{fmtTokens(r.tokensIn + r.tokensOut)}</td>
-                <td className="mono">{fmtUsd(r.costUsd, 3)}</td>
-                <td className="muted">{new Date(r.createdAt).toLocaleString()}</td>
-                <td className="whitespace-nowrap">
-                  <Link href={`/runs/${r.id}/report`} className="muted text-xs hover:text-white">
-                    report
-                  </Link>
-                  {" · "}
-                  <Link href={`/runs/${r.id}/studio`} className="muted text-xs hover:text-white">
-                    studio
-                  </Link>
-                </td>
-              </tr>
-            ))}
-            {runs && runs.length === 0 && (
-              <tr>
-                <td colSpan={10} className="muted py-6 text-center">
-                  No runs yet. Start one from Setup.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      <ErrorAlert error={error} />
+      <Table title="Runs" count={runs?.length ?? undefined} aria-busy={runs === null}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Run</TableHead>
+            <TableHead>Scenario</TableHead>
+            <TableHead>Merchant</TableHead>
+            <TableHead>Modes</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead numeric>Score</TableHead>
+            <TableHead numeric>Tokens</TableHead>
+            <TableHead numeric>Cost</TableHead>
+            <TableHead>Created</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {runs === null ? (
+            <TableLoading columns={COLUMNS} />
+          ) : runs.length === 0 ? (
+            error ? (
+            <TableEmpty colSpan={COLUMNS} reason="error" title="Runs could not be loaded" description="The message above says why. This list refreshes on its own once the api answers." />
+          ) : (
+            <TableEmpty colSpan={COLUMNS} title="No runs yet" description="Release the first swarm from Setup." />
+          )
+          ) : (
+            runs.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <Link href={`/runs/${r.id}`} className="hover:underline">
+                      {r.name}
+                    </Link>
+                    <span className="type-code-sm text-text-3">{r.id}</span>
+                  </div>
+                </TableCell>
+                <TableCell mono>{r.scenario}</TableCell>
+                <TableCell>{r.merchantProfile}</TableCell>
+                <TableCell>
+                  <ModeTags modes={r.score?.modes ?? null} />
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <RunStatus status={r.status} />
+                    <Link href={`/runs/${r.id}/report`} className="type-label-sm text-text-2 hover:text-text-1">
+                      Report
+                    </Link>
+                    <Link href={`/runs/${r.id}/studio`} className="type-label-sm text-text-2 hover:text-text-1">
+                      Studio
+                    </Link>
+                  </div>
+                </TableCell>
+                <TableCell numeric>{r.score?.score ? `${r.score.score.overall} ${r.score.score.grade}` : "None"}</TableCell>
+                <TableCell numeric>{fmtTokens(r.tokensIn + r.tokensOut)}</TableCell>
+                <TableCell numeric>{fmtUsd(r.costUsd, 3)}</TableCell>
+                <TableCell mono>{new Date(r.createdAt).toLocaleString()}</TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </>
   );
 }

@@ -1,107 +1,103 @@
 "use client";
-import type { ReactNode } from "react";
+import Link from "next/link";
+import type { ComponentProps, ReactNode } from "react";
 import type { Modes, Severity } from "@/lib/api";
+import { API } from "@/lib/api";
+import type { OrderRow } from "@/lib/arena";
+import { Alert, AlertDescription, AlertTitle } from "@/components/sodium/ui/alert";
+import { Button } from "@/components/sodium/ui/button";
+import { Status, type StatusValue } from "@/components/sodium/ui/status";
+import { Tag } from "@/components/sodium/ui/tag";
 
-export function Chip({ children, tone = "", title }: { children: ReactNode; tone?: "" | "ok" | "warn" | "bad" | "info" | "muted" | "accent"; title?: string }) {
+/** A run's status word and mark from the api's status string. */
+export function runStatus(status: string, paused = false): { value: StatusValue; word: string } {
+  if (paused) return { value: "paused", word: "Paused" };
+  switch (status) {
+    case "created":
+      return { value: "queued", word: "Queued" };
+    case "running":
+      return { value: "running", word: "Running" };
+    case "paused":
+      return { value: "paused", word: "Paused" };
+    case "finished":
+      return { value: "ok", word: "Finished" };
+    case "finished_budget":
+      return { value: "warn", word: "Budget hit" };
+    case "stopped":
+      return { value: "idle", word: "Stopped" };
+    case "failed":
+      return { value: "fail", word: "Failed" };
+    default:
+      return { value: "idle", word: status.replace(/_/g, " ") };
+  }
+}
+
+export function RunStatus({ status, paused, live, size = "sm" }: { status: string; paused?: boolean; live?: boolean; size?: "sm" | "default" }) {
+  const s = runStatus(status, paused);
   return (
-    <span className={`chip ${tone ? `chip-${tone}` : ""}`} title={title}>
-      {children}
-    </span>
+    <Status status={s.value} size={size} live={live}>
+      {s.word}
+    </Status>
   );
 }
 
-export function SeverityChip({ severity }: { severity: Severity }) {
-  const tone = severity === "critical" || severity === "high" ? "bad" : severity === "medium" ? "warn" : severity === "low" ? "info" : "muted";
-  return <Chip tone={tone}>{severity}</Chip>;
-}
+const SEVERITY: Record<Severity, ComponentProps<typeof Tag>["variant"]> = { critical: "fail", high: "fail", medium: "warn", low: "neutral", info: "outline" };
 
-export function StatusChip({ status }: { status: string }) {
-  const tone = status === "running" ? "ok" : status === "paused" ? "warn" : status === "finished" ? "info" : status === "failed" ? "bad" : status.startsWith("finished") ? "warn" : "muted";
+export function SeverityTag({ severity, size = "sm" }: { severity: Severity; size?: "sm" | "default" }) {
   return (
-    <Chip tone={tone}>
-      {status === "running" && <span className="live-dot mr-1.5" />}
-      {status.replace("_", " ")}
-    </Chip>
+    <Tag variant={SEVERITY[severity]} size={size}>
+      {severity}
+    </Tag>
   );
 }
 
-export function ModeBadges({ modes, compact = false }: { modes: Pick<Modes, "paypal" | "llm"> | null | undefined; compact?: boolean }) {
+const ORDER_TAG: Record<OrderRow["status"], ComponentProps<typeof Tag>["variant"]> = { created: "neutral", approved: "outline", captured: "ok", shipped: "ok", declined: "fail", refunded: "warn", disputed: "fail" };
+
+export function OrderStatusTag({ status }: { status: OrderRow["status"] }) {
+  return (
+    <Tag variant={ORDER_TAG[status]} size="sm">
+      {status}
+    </Tag>
+  );
+}
+
+/** The two modes a run ran in: where PayPal calls went and who drove the agents. Kinds of thing, so neutral tags. */
+export function ModeTags({ modes, size = "sm" }: { modes: Pick<Modes, "paypal" | "llm"> | null | undefined; size?: "sm" | "default" }) {
   if (!modes) return null;
   return (
     <span className="inline-flex gap-1.5">
-      <Chip tone={modes.paypal === "sandbox" ? "accent" : "muted"} title={modes.paypal === "sandbox" ? "Real PayPal sandbox calls via Agent Toolkit + Server SDK" : "In-process PayPal mock with identical tool names and schemas"}>
-        {compact ? "" : "PayPal "}
-        {modes.paypal}
-      </Chip>
-      <Chip tone={modes.llm === "live" ? "accent" : "muted"} title={modes.llm === "live" ? "Claude via OpenRouter (API key)" : "Scripted zero-token agents; add OPENROUTER_API_KEY for live LLM shoppers"}>
-        {compact ? "" : "LLM "}
-        {modes.llm}
-      </Chip>
+      <Tag size={size} variant={modes.paypal === "sandbox" ? "neutral" : "outline"} title={modes.paypal === "sandbox" ? "Real PayPal sandbox calls through the Agent Toolkit and Server SDK" : "In-process PayPal mock with the same tool names and schemas"}>
+        PayPal {modes.paypal}
+      </Tag>
+      <Tag size={size} variant={modes.llm === "live" ? "neutral" : "outline"} title={modes.llm === "live" ? "Claude through OpenRouter" : "Scripted agents that spend zero tokens"}>
+        LLM {modes.llm}
+      </Tag>
     </span>
   );
 }
 
-export function Section({ title, right, children, className = "", bodyClass = "" }: { title: ReactNode; right?: ReactNode; children: ReactNode; className?: string; bodyClass?: string }) {
-  return (
-    <section className={`panel ${className}`}>
-      <header className="flex items-center justify-between gap-2 px-4 py-2.5" style={{ borderBottom: "1px solid var(--line)" }}>
-        <h2 className="text-sm font-semibold">{title}</h2>
-        {right}
-      </header>
-      <div className={`p-4 ${bodyClass}`}>{children}</div>
-    </section>
-  );
+/** Turns a thrown error into a sentence that says what to do. A failed fetch is almost always the api not running. */
+export function describeError(error: unknown): string {
+  const message = String((error as Error)?.message ?? error);
+  if (/failed to fetch|networkerror|load failed/i.test(message)) return `The api at ${API} did not answer. Start it (pnpm dev in apps/api) or point NEXT_PUBLIC_API_URL at a running one, then reload.`;
+  return message;
 }
 
-export function Stat({ label, value, sub, tone }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "ok" | "warn" | "bad" | "info" }) {
-  const color = tone ? `var(--${tone})` : undefined;
-  return (
-    <div className="panel-2 px-3 py-2">
-      <div className="muted text-[11px] uppercase tracking-wide">{label}</div>
-      <div className="mono text-lg font-semibold" style={{ color }}>
-        {value}
-      </div>
-      {sub && <div className="muted text-xs">{sub}</div>}
-    </div>
-  );
-}
-
-export function Bar({ value, max, tone = "ok" }: { value: number; max: number; tone?: "ok" | "warn" | "bad" | "info" | "accent" }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
-  return (
-    <div className="bar">
-      <div style={{ width: `${pct}%`, background: `var(--${tone})` }} />
-    </div>
-  );
-}
-
-export function Empty({ children }: { children: ReactNode }) {
-  return <div className="muted py-6 text-center text-sm">{children}</div>;
-}
-
-export function ErrorBox({ error }: { error: unknown }) {
+export function ErrorAlert({ error }: { error: unknown }) {
   if (!error) return null;
   return (
-    <div className="rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid var(--bad)", color: "var(--bad)", background: "color-mix(in srgb, var(--bad) 10%, transparent)" }}>
-      {String((error as Error).message ?? error)}
-    </div>
+    <Alert status="fail">
+      <AlertTitle>Request to the api</AlertTitle>
+      <AlertDescription>{describeError(error)}</AlertDescription>
+    </Alert>
   );
 }
 
-export function ScoreRing({ score, grade, size = 120 }: { score: number; grade: string; size?: number }) {
-  const r = (size - 14) / 2;
-  const c = 2 * Math.PI * r;
-  const tone = score >= 85 ? "var(--ok)" : score >= 65 ? "var(--warn)" : "var(--bad)";
+/** A Button that moves to another page: rendered as the link itself, one tab stop. */
+export function LinkButton({ href, children, variant = "secondary", size, className, target }: { href: string; children: ReactNode; variant?: ComponentProps<typeof Button>["variant"]; size?: ComponentProps<typeof Button>["size"]; className?: string; target?: string }) {
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`Readiness score ${score} of 100, grade ${grade}`}>
-      <circle cx={size / 2} cy={size / 2} r={r} stroke="var(--line)" strokeWidth="10" fill="none" />
-      <circle cx={size / 2} cy={size / 2} r={r} stroke={tone} strokeWidth="10" fill="none" strokeLinecap="round" strokeDasharray={`${(score / 100) * c} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      <text x="50%" y="48%" textAnchor="middle" fontSize={size / 4} fontWeight="700" fill="var(--text)" className="mono">
-        {score}
-      </text>
-      <text x="50%" y="68%" textAnchor="middle" fontSize={size / 8} fill={tone} fontWeight="600">
-        grade {grade}
-      </text>
-    </svg>
+    <Button render={<Link href={href} target={target} />} nativeButton={false} variant={variant} size={size} className={className}>
+      {children}
+    </Button>
   );
 }

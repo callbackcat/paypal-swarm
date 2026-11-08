@@ -1,11 +1,10 @@
 "use client";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Empty } from "@/components/ui";
+import { LinkButton } from "@/components/ui";
 
-const SwarmStudio = dynamic(() => import("@/components/SwarmStudio"), { ssr: false, loading: () => <Empty>Loading AG Studio…</Empty> });
+const SwarmStudio = dynamic(() => import("@/components/SwarmStudio"), { ssr: false, loading: () => <p className="type-body-sm text-text-2">Loading AG Studio.</p> });
 
 function StudioInner({ id }: { id: string }) {
   const search = useSearchParams();
@@ -16,26 +15,20 @@ function StudioInner({ id }: { id: string }) {
 export default function StudioPage() {
   const { id } = useParams<{ id: string }>();
   return (
-    <div className="space-y-3">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Studio analyst</h1>
-          <div className="muted text-xs">
-            AG Studio over the run's event log: orders, findings, webhooks, agent turns. Ask the analyst to build widgets that expose failures. Its tokens count against the same run budget.
-          </div>
+    <>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex max-w-measure flex-col gap-2">
+          <h1 className="type-title">Studio analyst</h1>
+          <p className="type-body-sm text-text-2">AG Studio over the run&apos;s event log: orders, findings, webhooks and agent turns. Ask the analyst to build widgets that expose failures. Its tokens count against the same run budget.</p>
         </div>
         <div className="flex gap-2">
-          <Link href={`/runs/${id}`} className="btn">
-            Arena
-          </Link>
-          <Link href={`/runs/${id}/report`} className="btn">
-            Report
-          </Link>
+          <LinkButton href={`/runs/${id}`}>Arena</LinkButton>
+          <LinkButton href={`/runs/${id}/report`}>Report</LinkButton>
         </div>
-      </header>
-      <Suspense fallback={<Empty>Loading…</Empty>}>
+      </div>
+      <Suspense fallback={<p className="type-body-sm text-text-2">Loading.</p>}>
         <StudioInner id={id} />
       </Suspense>
-    </div>
+    </>
   );
 }

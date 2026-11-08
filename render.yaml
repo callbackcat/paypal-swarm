@@ -1,11 +1,12 @@
-# Render blueprint: web (Next.js) + api (Hono + run executor) + Postgres.
+# Render blueprint: the api (Hono + run executor) and its Postgres. The web app is deployed on Vercel
+# (apps/web) with NEXT_PUBLIC_API_URL pointing at this service.
 # Deploy: Render dashboard → Blueprints → New → this repo. Then fill the `sync: false` secrets.
 # Everything works with no secrets at all (mock PayPal + scripted agents); add them to go live.
 services:
   - type: web
     name: swarm-api
     runtime: node
-    plan: starter
+    plan: free
     region: oregon
     rootDir: .
     buildCommand: corepack enable && corepack prepare pnpm@10.30.3 --activate && pnpm install --frozen-lockfile && pnpm --filter @swarm/db db:migrate
@@ -22,7 +23,7 @@ services:
       - key: SWARM_KMS_KEY
         generateValue: true
       - key: CORS_ORIGIN
-        value: "*" # tighten to https://<swarm-web host> once you know it
+        value: "*" # tighten to the Vercel URL once you know it, e.g. https://paypal-swarm.vercel.app
       - key: PUBLIC_API_URL
         fromService:
           type: web
@@ -52,31 +53,8 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
 
-  - type: web
-    name: swarm-web
-    runtime: node
-    plan: starter
-    region: oregon
-    rootDir: .
-    buildCommand: corepack enable && corepack prepare pnpm@10.30.3 --activate && pnpm install --frozen-lockfile && pnpm --filter @swarm/web build
-    startCommand: pnpm --filter @swarm/web start
-    autoDeploy: true
-    envVars:
-      - key: NODE_VERSION
-        value: "20"
-      - key: NEXT_TELEMETRY_DISABLED
-        value: "1"
-      # The web app is built with the api hostname inlined (https:// is added at build time).
-      - key: NEXT_PUBLIC_API_HOST
-        fromService:
-          type: web
-          name: swarm-api
-          property: host
-      - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
-        sync: false
-
 databases:
   - name: swarm-db
-    plan: basic-256mb
+    plan: free
     region: oregon
     postgresMajorVersion: "16"

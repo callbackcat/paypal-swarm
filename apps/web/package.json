@@ -10,24 +10,31 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@swarm/core": "workspace:*",
+    "@tanstack/react-virtual": "^3.14.26",
+    "ag-grid-community": "~36.3.0",
+    "ag-grid-react": "~36.3.0",
+    "ag-studio": "3.1.0",
+    "ag-studio-react": "3.1.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.52.0",
     "next": "15.5.29",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "ag-studio-react": "3.1.0",
-    "ag-grid-community": "~36.3.0",
-    "ag-grid-react": "~36.3.0",
-    "lucide-react": "^1.68.0",
-    "@swarm/core": "workspace:*",
-    "ag-studio": "3.1.0"
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
-    "typescript": "~5.9.3",
+    "@tailwindcss/postcss": "4.1.18",
     "@types/node": "^20.19.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.0",
-    "tailwindcss": "4.1.18",
-    "@tailwindcss/postcss": "4.1.18",
+    "@typescript-eslint/parser": "^8.72.1",
+    "eslint": "^9.39.5",
     "postcss": "^8.5.6",
+    "tailwindcss": "4.1.18",
+    "typescript": "~5.9.3",
     "vitest": "^3.2.4"
   }
 }
