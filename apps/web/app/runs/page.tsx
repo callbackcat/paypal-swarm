@@ -41,12 +41,12 @@ export default function RunsPage() {
             <TableHead>Run</TableHead>
             <TableHead>Scenario</TableHead>
             <TableHead>Merchant</TableHead>
-            <TableHead>Modes</TableHead>
+            <TableHead className="hidden lg:table-cell">Modes</TableHead>
             <TableHead>Status</TableHead>
             <TableHead numeric>Score</TableHead>
-            <TableHead numeric>Tokens</TableHead>
-            <TableHead numeric>Cost</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead numeric className="hidden lg:table-cell">Tokens</TableHead>
+            <TableHead numeric className="hidden lg:table-cell">Cost</TableHead>
+            <TableHead className="hidden lg:table-cell">Created</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -71,7 +71,7 @@ export default function RunsPage() {
                 </TableCell>
                 <TableCell mono>{r.scenario}</TableCell>
                 <TableCell>{r.merchantProfile}</TableCell>
-                <TableCell>
+                <TableCell className="hidden lg:table-cell">
                   <ModeTags modes={r.score?.modes ?? null} />
                 </TableCell>
                 <TableCell>
@@ -86,9 +86,9 @@ export default function RunsPage() {
                   </div>
                 </TableCell>
                 <TableCell numeric>{r.score?.score ? `${r.score.score.overall} ${r.score.score.grade}` : "None"}</TableCell>
-                <TableCell numeric>{fmtTokens(r.tokensIn + r.tokensOut)}</TableCell>
-                <TableCell numeric>{fmtUsd(r.costUsd, 3)}</TableCell>
-                <TableCell mono>{new Date(r.createdAt).toLocaleString()}</TableCell>
+                <TableCell numeric className="hidden lg:table-cell">{fmtTokens(r.tokensIn + r.tokensOut)}</TableCell>
+                <TableCell numeric className="hidden lg:table-cell">{fmtUsd(r.costUsd, 3)}</TableCell>
+                <TableCell mono className="hidden lg:table-cell">{new Date(r.createdAt).toLocaleString()}</TableCell>
               </TableRow>
             ))
           )}

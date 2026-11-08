@@ -1,13 +1,12 @@
 <p align="center">
-  <img src="assets/swarm.svg" alt="Swarm: a crowd of LLM shoppers, a merchant agent and a chaos agent hammer a PayPal store while every event streams into the Arena, the Report and the Studio" width="100%">
+  <img src="assets/honeycomb.svg" alt="paypal-swarm logo: a honeycomb" width="96" height="96">
 </p>
 
-<h1 align="center">Swarm</h1>
+<h1 align="center">paypal-swarm</h1>
 
 <h3 align="center"><em>Before you let AI agents near your checkout, watch a swarm of them try to break it.</em></h3>
 
 <p align="center">
-  An agentic-commerce flight simulator for PayPal merchants.<br>
   Unleash a crowd of LLM shoppers and a chaos agent on your PayPal sandbox store, watch it live, and get an agent-readiness score with the exact PayPal ids behind every finding.
 </p>
 
@@ -19,6 +18,10 @@
   <a href="#token-budget-guard">Budget guard</a> ·
   <a href="#api">API</a> ·
   <a href="#deploy">Deploy</a>
+</p>
+
+<p align="center">
+  <img src="assets/swarm.svg" alt="A crowd of LLM shoppers, a merchant agent and a chaos agent hammer a PayPal store while every event streams into the Arena, the Report and the Studio" width="100%">
 </p>
 
 ---

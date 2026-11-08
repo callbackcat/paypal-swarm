@@ -5,7 +5,7 @@ import { SodiumPortalProvider } from "@/lib/sodium/portal";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "Swarm: agentic-commerce flight simulator",
+  title: "paypal-swarm",
   description: "Point LLM shoppers, a merchant agent and a chaos agent at a PayPal sandbox store. Watch it live. Get an agent-readiness report.",
 };
 

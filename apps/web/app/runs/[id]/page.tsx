@@ -11,7 +11,7 @@ import { DataList, DataListItem, DataListLabel, DataListValue } from "@/componen
 import { Frame, FrameBody, FrameDescription, FrameHeader, FrameStatus, FrameTitle, FrameValue } from "@/components/sodium/ui/frame";
 import { LogViewer, type LogLevel, type LogLine } from "@/components/sodium/ui/log-viewer";
 import { Meter, MeterLabel, MeterValue } from "@/components/sodium/ui/meter";
-import { SegmentedControl, SegmentedControlItem } from "@/components/sodium/ui/segmented-control";
+import { FilterBar, FilterBarClear, FilterBarCount, FilterToggle } from "@/components/sodium/ui/filter-bar";
 import { Status, StatusMark } from "@/components/sodium/ui/status";
 import { StatusStrip, StatusStripCell, StatusStripLabel, StatusStripUnit, StatusStripValue } from "@/components/sodium/ui/status-strip";
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from "@/components/sodium/ui/table";
@@ -328,13 +328,15 @@ export default function ArenaPage() {
         </Table>
 
         <div className="flex flex-col gap-3">
-          <SegmentedControl multiple size="sm" value={filter} onValueChange={(v) => setFilter(v as string[])} aria-label="Actors in the feed">
+          <FilterBar aria-label="Actors in the feed">
             {CLASSES.map((c) => (
-              <SegmentedControlItem key={c} value={c} count={classCounts[c] ?? 0}>
-                {c}
-              </SegmentedControlItem>
+              <FilterToggle key={c} pressed={filterSet.has(c)} onPressedChange={(on) => setFilter((prev) => (on ? [...prev, c] : prev.filter((x) => x !== c)))}>
+                {c} {classCounts[c] ?? 0}
+              </FilterToggle>
             ))}
-          </SegmentedControl>
+            <FilterBarCount shown={lines.length} total={state.feed.length} noun="events" />
+            {filter.length < CLASSES.length && <FilterBarClear onClick={() => setFilter([...CLASSES])} />}
+          </FilterBar>
           <LogViewer label="Event feed" name={run?.name ?? id} lines={lines} streaming={!finished} toolbar height={560} />
         </div>
 
@@ -443,7 +445,9 @@ export default function ArenaPage() {
                   .slice(0, 40)
                   .map((w) => (
                     <TableRow key={w.id}>
-                      <TableCell mono>{w.eventType}</TableCell>
+                      <TableCell mono className="whitespace-normal wrap-anywhere">
+                        {w.eventType}
+                      </TableCell>
                       <TableCell numeric>{fmtLag(w.lagMs)}</TableCell>
                       <TableCell>
                         {w.verified ? (
