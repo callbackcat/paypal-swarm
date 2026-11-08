@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtTokens, fmtUsd, type Estimate, type Modes, type PlanResult, type RunConfigInput, type RunListItem, type ScenariosResponse } from "@/lib/api";
 import { ErrorAlert, ModeTags, RunStatus, ScenarioListSkeleton, ValueSkeleton } from "@/components/ui";
-import { SwarmHero } from "@/components/SwarmHero";
 import { SwarmLauncher } from "@/components/SwarmLauncher";
 import { ArrowUpRight, Icon } from "@/components/sodium/icon";
 import { Button } from "@/components/sodium/ui/button";
@@ -161,43 +160,32 @@ export default function SetupPage() {
 
   return (
     <>
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-5 lg:items-center">
-        <div className="flex max-w-measure flex-col gap-3 lg:col-span-2">
+      <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-6 lg:py-10">
+        <div className="flex flex-col items-center gap-3 text-center">
           <h1 className="type-title">Release a swarm at your checkout</h1>
-          <p className="type-body text-text-2">
-            Swarm points LLM shoppers, a merchant agent and a chaos agent at a PayPal sandbox store, watches what breaks and scores how ready the store is for agentic commerce. Say what to try in one sentence, confirm the plan and the cost, then watch the Arena. Nothing touches a real PayPal account unless you give it sandbox credentials.
+          <p className="max-w-measure type-body text-text-2">
+            LLM shoppers, a merchant agent and a chaos agent hit a PayPal sandbox store. Swarm watches what breaks and scores how ready the store is for agentic commerce. Say what to try in one sentence, confirm the plan and the cost, then watch the Arena.
           </p>
         </div>
-        <div className="min-w-0 lg:col-span-3">
-          <SwarmHero scenarioLabel={current?.id ?? "black-friday"} />
-        </div>
+        <ErrorAlert error={error} />
+        <SwarmLauncher scenarios={data?.scenarios ?? null} onPlan={applyPlan} onRelease={(both) => void start(both)} estimateLine={estimateLine} starting={starting} blocker={blocker} formId="fine-tune" />
+        <ol className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {[
+            ["Describe", "One sentence: who the shoppers are, what to break, which merchant. A preset works too."],
+            ["Confirm", "The plan shows the scenario, the shoppers, the model and the estimated cost. Hard caps stop a runaway run."],
+            ["Watch, then read", "The Arena streams every agent turn and PayPal call live. The Report scores it and names the fix; the Studio is the deep dive."],
+          ].map(([title, body], i) => (
+            <li key={title} className="flex gap-3">
+              <span className="type-label text-accent-text">{String(i + 1).padStart(2, "0")}</span>
+              <span className="flex flex-col gap-1">
+                <span className="type-body text-text-1">{title}</span>
+                <span className="type-body-sm text-text-2">{body}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="text-center type-caption text-text-3">Why: an agent that shops for a human will hit your checkout the way these do. Swarm finds the gaps before a real one does, on a sandbox, for cents. Nothing touches a real PayPal account unless you give it sandbox credentials.</p>
       </section>
-      <ErrorAlert error={error} />
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <SwarmLauncher scenarios={data?.scenarios ?? null} onPlan={applyPlan} onRelease={(both) => void start(both)} estimateLine={estimateLine} starting={starting} blocker={blocker} formId="fine-tune" />
-        </div>
-        <aside className="flex flex-col gap-4">
-          <h2 className="type-heading-sm">How it works</h2>
-          <ol className="flex flex-col gap-4">
-            {[
-              ["Describe", "One sentence: who the shoppers are, what to break, which merchant. A preset works too."],
-              ["Confirm", "The plan shows the scenario, the shoppers, the model and the estimated cost. Hard caps stop a runaway run."],
-              ["Watch, then read", "The Arena streams every agent turn and PayPal call live. The Report scores it and names the fix; the Studio is the deep dive."],
-            ].map(([title, body], i) => (
-              <li key={title} className="flex gap-3">
-                <span className="type-label text-accent-text">{String(i + 1).padStart(2, "0")}</span>
-                <span className="flex flex-col gap-1">
-                  <span className="type-body text-text-1">{title}</span>
-                  <span className="type-body-sm text-text-2">{body}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
-          <p className="type-caption text-text-3">Why: an agent that shops for a human will hit your checkout the way these do. Swarm finds the gaps before a real one does, on a sandbox, for cents.</p>
-        </aside>
-      </div>
 
       <section id="fine-tune" className="flex max-w-measure flex-col gap-2 scroll-mt-6">
         <h2 className="type-heading">Fine-tune</h2>
