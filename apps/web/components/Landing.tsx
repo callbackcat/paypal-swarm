@@ -1,17 +1,22 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { Activity, ArrowUpRight, Branch, Code, DataBase, Document, Flow, Icon, Lightning, Locked, Meter, Play, Renew, Time } from "@/components/sodium/icon";
+import { Activity, ArrowUpRight, Branch, Code, DataBase, Document, Flow, Icon, Lightning, Locked, Meter as MeterIcon, Renew, Time } from "@/components/sodium/icon";
 import { Button } from "@/components/sodium/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleGroup, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
+import { DataList, DataListItem, DataListLabel, DataListValue } from "@/components/sodium/ui/data-list";
+import { Frame, FrameBody, FrameFooter, FrameHeader, FrameMeta, FrameTitle, FrameValue } from "@/components/sodium/ui/frame";
+import { Meter, MeterLabel, MeterValue } from "@/components/sodium/ui/meter";
+import { StatusStrip, StatusStripCell, StatusStripLabel, StatusStripUnit, StatusStripValue } from "@/components/sodium/ui/status-strip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/sodium/ui/table";
+import { Tag } from "@/components/sodium/ui/tag";
 import { cn } from "@/lib/sodium/utils";
 
 /**
- * The static sections of the Setup page below the launcher, in the order of a product landing page: the stack, the
- * two ways to run, how the score is made, the measured numbers, questions, and a last call back to the launcher.
- * Every figure here is a measured one (README, 9 Nov 2026); the images are screenshots of real runs.
+ * The Setup page below the launcher, in the order of a product page: the stack, two ways to run, how the score is
+ * made, the measured numbers, questions, and a last call back to the launcher. The pictures are small coded replicas
+ * of the Arena, the settings and the Report, drawn with the same components and the numbers of one real run
+ * (haiku-9nov-b black-friday baseline, 9 Nov 2026). Every figure on the page is a measured one.
  */
 
 /** Scrolls back to the launcher and puts the caret in the box. */
@@ -22,57 +27,194 @@ export function focusLauncher() {
 
 const STACK = ["PayPal Agent Toolkit", "PayPal Server SDK", "PayPal Sandbox", "OpenRouter", "Vercel AI SDK", "AG Grid Studio", "Hono", "Next.js"];
 
-/** One wide landing section: a rule above, the same gutter and width as the rest. */
-function Section({ id, className, children }: { id?: string; className?: string; children: ReactNode }) {
-  return (
-    <section id={id} className={cn("flex w-full flex-col gap-10 border-t border-line py-14 lg:py-20", className)}>
-      {children}
-    </section>
-  );
+/** One wide landing section: a rule above, the page gutter, generous air. */
+function Section({ className, children }: { className?: string; children: ReactNode }) {
+  return <section className={cn("flex w-full flex-col gap-10 border-t border-line py-14 lg:py-20", className)}>{children}</section>;
 }
 
-/** A centred section heading: the sentence that names it and one or two lines under it. */
-function Heading({ title, children, align = "center" }: { title: string; children?: ReactNode; align?: "center" | "start" }) {
+/** A centred section heading: the sentence that names it, at most one line under it. */
+function Heading({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className={cn("flex max-w-measure flex-col gap-3", align === "center" ? "mx-auto items-center text-center" : "items-start")}>
+    <div className="mx-auto flex max-w-measure flex-col items-center gap-3 text-center">
       <h2 className="type-heading text-text-1">{title}</h2>
       {children ? <p className="type-body text-text-2">{children}</p> : null}
     </div>
   );
 }
 
-/** Three short facts under a path: a glyph, a mono name and one line. */
+/** Three short facts: a glyph, a mono name, one line. */
 function Facts({ items }: { items: Array<{ icon: typeof Lightning; title: string; line: string }> }) {
   return (
     <ul className="flex flex-col divide-y divide-line-faint border-y border-line-faint">
       {items.map((f) => (
-        <li key={f.title} className="flex items-start gap-3 py-3">
-          <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center border border-line text-text-2" aria-hidden>
-            <Icon icon={f.icon} size={14} />
-          </span>
-          <span className="flex min-w-0 flex-col gap-0.5">
+        <li key={f.title} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:gap-3">
+          <span className="flex items-center gap-3">
+            <span className="flex size-6 shrink-0 items-center justify-center border border-line text-text-2" aria-hidden>
+              <Icon icon={f.icon} size={14} />
+            </span>
             <span className="type-label text-text-1">{f.title}</span>
-            <span className="type-body-sm text-text-2">{f.line}</span>
           </span>
+          <span className="ps-9 type-body-sm text-text-2 sm:ms-auto sm:ps-0 sm:text-end">{f.line}</span>
         </li>
       ))}
     </ul>
   );
 }
 
-/** A screenshot of a real run, edged once. */
-function Shot({ src, alt, width, height, className }: { src: string; alt: string; width: number; height: number; className?: string }) {
+/** A still of a screen, drawn with the real components: nothing in it takes focus or a click. */
+function Still({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <div className={cn("overflow-hidden border border-line bg-panel", className)}>
-      <Image src={src} alt={alt} width={width} height={height} sizes="(min-width: 1024px) 560px, 100vw" className="block h-auto w-full" />
+    <div role="img" aria-label={label} inert className={cn("pointer-events-none select-none", className)}>
+      {children}
     </div>
+  );
+}
+
+/** The Arena, reduced: the strip and four orders of the measured Black Friday baseline run. */
+function ArenaStill() {
+  const rows: Array<{ who: string; amount: string; status: "captured" | "declined"; line: string }> = [
+    { who: "Hana Tanaka", amount: "$50.50", status: "captured", line: "no tracking for 22:36" },
+    { who: "Noah Byrne", amount: "$18.50", status: "declined", line: "0500 at capture" },
+    { who: "Sofia Costa", amount: "$29.00", status: "captured", line: "no tracking for 22:44" },
+    { who: "Yuki Lindqvist", amount: "$50.50", status: "captured", line: "no tracking for 23:47" },
+  ];
+  return (
+    <Still label="The Arena of a Black Friday run: 37 orders, 31 captured, 4 declined, and the order board">
+      <Frame variant="panel">
+        <StatusStrip variant="plain" label="Run" className="border-b border-line">
+          <StatusStripCell>
+            <StatusStripLabel>Orders</StatusStripLabel>
+            <StatusStripValue>
+              37 <StatusStripUnit>created</StatusStripUnit>
+            </StatusStripValue>
+          </StatusStripCell>
+          <StatusStripCell>
+            <StatusStripLabel>Captured</StatusStripLabel>
+            <StatusStripValue>
+              31 <StatusStripUnit>0 shipped</StatusStripUnit>
+            </StatusStripValue>
+          </StatusStripCell>
+          <StatusStripCell>
+            <StatusStripLabel>Declined</StatusStripLabel>
+            <StatusStripValue>
+              4 <StatusStripUnit>0 refunded</StatusStripUnit>
+            </StatusStripValue>
+          </StatusStripCell>
+        </StatusStrip>
+        <Table size="sm" title="Orders" count={37}>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Shopper</TableHead>
+              <TableHead numeric>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="hidden sm:table-cell">Timeline</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => (
+              <TableRow key={r.who}>
+                <TableCell>{r.who}</TableCell>
+                <TableCell numeric>{r.amount}</TableCell>
+                <TableCell>
+                  <Tag size="sm" variant={r.status === "captured" ? "ok" : "fail"}>
+                    {r.status}
+                  </Tag>
+                </TableCell>
+                <TableCell className={cn("hidden type-code-sm sm:table-cell", r.status === "declined" ? "text-text-2" : "text-warn-text")}>{r.line}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Frame>
+    </Still>
+  );
+}
+
+/** The settings dialog, reduced to what the plan filled. */
+function SettingsStill() {
+  return (
+    <Still label="Run settings: Black Friday, baseline merchant, 40 shoppers, your own keys, 645k tokens about $0.14" className="mx-auto w-full max-w-sm">
+      <Frame variant="panel">
+        <FrameHeader>
+          <FrameTitle>run settings</FrameTitle>
+          <FrameValue meta>Black Friday</FrameValue>
+        </FrameHeader>
+        <FrameBody padding="none">
+          <DataList className="px-inset">
+            <DataListItem>
+              <DataListLabel>Scenario</DataListLabel>
+              <DataListValue>Black Friday, 40 shoppers</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>Merchant</DataListLabel>
+              <DataListValue>baseline, then hardened</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>Model</DataListLabel>
+              <DataListValue>claude-haiku-5.5</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>PayPal</DataListLabel>
+              <DataListValue>your sandbox, keys encrypted</DataListValue>
+            </DataListItem>
+            <DataListItem>
+              <DataListLabel>Token cap</DataListLabel>
+              <DataListValue>800k</DataListValue>
+            </DataListItem>
+          </DataList>
+        </FrameBody>
+        <FrameFooter>
+          <FrameMeta>645k tokens, about $0.14</FrameMeta>
+          <span className="flex gap-2">
+            <Button variant="secondary" size="sm" tabIndex={-1}>
+              Close
+            </Button>
+            <Button size="sm" tabIndex={-1}>
+              Release the swarm
+            </Button>
+          </span>
+        </FrameFooter>
+      </Frame>
+    </Still>
+  );
+}
+
+/** The Report's first frame: the score and the four dimensions of the same run. */
+function ReportStill() {
+  const dims: Array<{ name: string; value: number }> = [
+    { name: "Discoverability", value: 100 },
+    { name: "Transactability", value: 85 },
+    { name: "Fulfilment", value: 36 },
+    { name: "Resilience", value: 100 },
+  ];
+  return (
+    <Still label="A readiness report: 79 of 100, grade B; fulfilment 36 because 31 captures never got tracking">
+      <Frame variant="panel">
+        <FrameHeader>
+          <FrameTitle>Readiness</FrameTitle>
+          <FrameValue meta>grade B of 100</FrameValue>
+        </FrameHeader>
+        <FrameBody className="flex flex-row items-end justify-between gap-6">
+          <span className="type-figure text-text-1">79</span>
+          <span className="max-w-measure-hint text-end type-caption text-text-2">31 captures never got tracking: 40 points off fulfilment. The hardened merchant scored 99.</span>
+        </FrameBody>
+        <FrameBody className="flex flex-col gap-3 border-t border-line">
+          {dims.map((d) => (
+            <Meter key={d.name} size="sm" value={d.value} warnAt={null} failAt={null}>
+              <MeterLabel>{d.name}</MeterLabel>
+              <MeterValue>{(_f, v) => `${v} / 100`}</MeterValue>
+            </Meter>
+          ))}
+        </FrameBody>
+      </Frame>
+    </Still>
   );
 }
 
 export function StackStrip() {
   return (
     <Section className="gap-6">
-      <h2 className="text-center type-heading-sm text-text-2">The stack under every run</h2>
+      <h2 className="text-center type-heading-sm text-text-2">Built on</h2>
       <ul aria-label="Built with" className="grid grid-cols-2 gap-px border border-line bg-line sm:grid-cols-4 lg:grid-cols-8">
         {STACK.map((s) => (
           <li key={s} className="flex min-h-(--row) items-center justify-center bg-page px-3 text-center type-label text-text-1">
@@ -87,54 +229,56 @@ export function StackStrip() {
 export function Paths({ onSettings }: { onSettings: () => void }) {
   return (
     <Section>
-      <Heading title="Run it on the demo store, or point it at your own sandbox.">Both paths release the same shoppers, the same chaos and the same merchant agents. Only the keys change, and every report says which store it ran against.</Heading>
+      <Heading title="Two ways to run it.">Same shoppers, same chaos, same merchant agents. Only the keys change.</Heading>
 
       <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <h3 className="type-heading-sm text-text-1">Release a swarm on the demo store in one sentence</h3>
-            <p className="type-body text-text-2">No keys, no setup. Describe the crowd, confirm the plan and its cost, and watch the Arena fill with orders, declines and disputes against a seeded sandbox store.</p>
+          <div className="flex flex-col gap-2">
+            <h3 className="type-heading-sm text-text-1">On the demo store</h3>
+            <p className="type-body text-text-2">No keys, no setup. Describe the crowd, confirm the cost, watch it happen.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={focusLauncher}>
               Release the swarm
             </Button>
             <Button variant="secondary" size="sm" render={<Link href="/runs" />} nativeButton={false}>
-              Browse finished runs
+              Finished runs
             </Button>
           </div>
           <Facts
             items={[
-              { icon: Lightning, title: "Four scenarios", line: "Quiet Tuesday, Black Friday, Dispute storm and Lost parcels, each with its own chaos schedule" },
-              { icon: Meter, title: "Cents per run", line: "$0.007 to $0.06 on Claude Haiku 5.5, estimated before anything is spent" },
-              { icon: Locked, title: "Capped by construction", line: "Per-turn, per-actor and per-run token caps; the demo key sits behind a daily allowance" },
+              { icon: Lightning, title: "Four scenarios", line: "Quiet Tuesday to Black Friday" },
+              { icon: MeterIcon, title: "Cents per run", line: "$0.007 to $0.06 on Haiku 5.5" },
+              { icon: Locked, title: "Hard caps", line: "per turn, per shopper, per run" },
             ]}
           />
         </div>
-        <Shot src="/landing/arena.png" alt="The Arena of a finished Black Friday run: 37 orders created, 31 captured, 4 declined, and the order board with capture times and missing tracking" width={1152} height={572} />
+        <ArenaStill />
       </div>
 
       <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
-        <Shot src="/landing/settings.png" alt="The run settings dialog: scenario, merchant profile, options and bring-your-own keys" width={640} height={868} className="mx-auto w-full max-w-sm lg:order-first" />
+        <div className="lg:order-first">
+          <SettingsStill />
+        </div>
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
-            <h3 className="type-heading-sm text-text-1">Point the same swarm at your own PayPal sandbox</h3>
-            <p className="type-body text-text-2">Paste a sandbox client id and secret, and an OpenRouter key if you want your own model bill. The shoppers read your catalog, the merchant captures your orders, and the webhooks you register are matched against the event log.</p>
+          <div className="flex flex-col gap-2">
+            <h3 className="type-heading-sm text-text-1">On your own sandbox</h3>
+            <p className="type-body text-text-2">Paste a sandbox client id and secret. The swarm reads your catalog and captures your orders.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={onSettings}>
               Open settings
             </Button>
             <Button variant="ghost" size="sm" render={<a href="https://github.com/callbackcat/paypal-swarm#readme" target="_blank" rel="noreferrer" />} nativeButton={false}>
-              Read the setup
+              Setup guide
               <Icon icon={ArrowUpRight} />
             </Button>
           </div>
           <Facts
             items={[
-              { icon: Locked, title: "Keys encrypted at rest", line: "AES-GCM in the run row, decrypted inside the executor, never written to an event" },
-              { icon: DataBase, title: "Your catalog, paged", line: "Shoppers see your products the way an agent would, twelve at a time, shuffled per persona" },
-              { icon: Activity, title: "Webhooks measured", line: "Every PayPal webhook is matched to its event and its lag shows in the ticker" },
+              { icon: Locked, title: "Keys encrypted", line: "at rest, never in an event" },
+              { icon: DataBase, title: "Your catalog", line: "paged the way an agent sees it" },
+              { icon: Activity, title: "Your webhooks", line: "matched to events, lag measured" },
             ]}
           />
         </div>
@@ -146,26 +290,26 @@ export function Paths({ onSettings }: { onSettings: () => void }) {
 export function Engine() {
   return (
     <Section>
-      <Heading title="Ten rules behind every score.">The report is a pure function over the event log. No model grades the run: each rule reads the events, cites the PayPal ids it saw, and names the fix.</Heading>
-      <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-14">
-        <Shot src="/landing/report.png" alt="A readiness report: 79 of 100, grade B, with the four dimensions and the rules that deducted from each" width={1152} height={460} />
+      <Heading title="Ten rules make the score.">No model grades the run. Each rule reads the event log and names the fix.</Heading>
+      <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
+        <ReportStill />
         <div className="flex flex-col divide-y divide-line-faint">
           <div className="flex gap-4 pb-6">
             <span className="mt-1 flex size-6 shrink-0 items-center justify-center border border-line text-text-2" aria-hidden>
               <Icon icon={Flow} size={14} />
             </span>
-            <div className="flex flex-col gap-2">
-              <h3 className="type-heading-sm text-text-1">Findings from events, not impressions</h3>
-              <p className="type-body text-text-2">Capture without tracking, duplicate capture, unhandled decline, oversized refund, unanswered dispute, webhook gap, buyer left waiting, position bias, injection susceptibility. Each finding links the event ids and the PayPal ids behind it, so you can open the sandbox and see the same order.</p>
+            <div className="flex flex-col gap-1">
+              <h3 className="type-heading-sm text-text-1">Findings, not impressions</h3>
+              <p className="type-body text-text-2">Every finding cites its event ids and PayPal ids. Open the sandbox and see the same order.</p>
             </div>
           </div>
           <div className="flex gap-4 pt-6">
             <span className="mt-1 flex size-6 shrink-0 items-center justify-center border border-line text-text-2" aria-hidden>
               <Icon icon={Renew} size={14} />
             </span>
-            <div className="flex flex-col gap-2">
-              <h3 className="type-heading-sm text-text-1">Re-run with the fix and watch the score move</h3>
-              <p className="type-body text-text-2">The hardened merchant is prompt plus code: a per-order capture lock, a read of the capture status, tracking on capture, refund clamping and a dispute SLA. Same scenario, same seed, same chaos, so the difference in the score is the fix and nothing else.</p>
+            <div className="flex flex-col gap-1">
+              <h3 className="type-heading-sm text-text-1">Re-run with the fix</h3>
+              <p className="type-body text-text-2">Same seed, same chaos, the hardened merchant. The score moves and nothing else does.</p>
             </div>
           </div>
         </div>
@@ -175,23 +319,23 @@ export function Engine() {
 }
 
 /** Measured on 9 Nov 2026, all agents on Claude Haiku 5.5, PayPal sandbox, one run per cell (README). */
-const MEASURED: Array<{ scenario: string; shoppers: string; chaos: string; cost: string; wall: string; baseline: number; hardened: number }> = [
-  { scenario: "Quiet Tuesday", shoppers: "5", chaos: "none", cost: "$0.007", wall: "64 s", baseline: 90, hardened: 100 },
-  { scenario: "Black Friday", shoppers: "40", chaos: "declines, duplicate approvals, injection product, 429 storm", cost: "$0.044 to 0.058", wall: "145 to 169 s", baseline: 79, hardened: 99 },
-  { scenario: "Dispute storm", shoppers: "15", chaos: "5 chargebacks, oversized and double refunds", cost: "$0.022 to 0.025", wall: "92 to 96 s", baseline: 88, hardened: 99 },
-  { scenario: "Lost parcels", shoppers: "10", chaos: "missing tracking, 30 percent webhook drops", cost: "$0.012 to 0.019", wall: "88 s", baseline: 90, hardened: 100 },
+const MEASURED: Array<{ scenario: string; shoppers: string; cost: string; wall: string; baseline: number; hardened: number }> = [
+  { scenario: "Quiet Tuesday", shoppers: "5", cost: "$0.007", wall: "64 s", baseline: 90, hardened: 100 },
+  { scenario: "Black Friday", shoppers: "40", cost: "$0.044 to 0.058", wall: "145 to 169 s", baseline: 79, hardened: 99 },
+  { scenario: "Dispute storm", shoppers: "15", cost: "$0.022 to 0.025", wall: "92 to 96 s", baseline: 88, hardened: 99 },
+  { scenario: "Lost parcels", shoppers: "10", cost: "$0.012 to 0.019", wall: "88 s", baseline: 90, hardened: 100 },
 ];
 
 export function Measured() {
   return (
     <Section>
-      <Heading title="Measured, not promised.">Every scenario was run against both merchants on 9 Nov 2026 with Claude Haiku 5.5 driving every agent. The numbers below are what those runs cost and scored.</Heading>
-      <Table size="sm" title="Four scenarios, baseline against hardened" count={MEASURED.length}>
+      <Heading title="Measured, not promised.">Four scenarios, both merchants, Claude Haiku 5.5 on every agent, 9 Nov 2026.</Heading>
+      <div className="mx-auto w-full max-w-3xl">
+      <Table size="sm" title="Cost and score per scenario" count={MEASURED.length}>
         <TableHeader>
           <TableRow>
             <TableHead>Scenario</TableHead>
             <TableHead numeric>Shoppers</TableHead>
-            <TableHead>Chaos</TableHead>
             <TableHead numeric>Cost</TableHead>
             <TableHead numeric>Wall</TableHead>
             <TableHead numeric>Baseline</TableHead>
@@ -203,7 +347,6 @@ export function Measured() {
             <TableRow key={m.scenario}>
               <TableCell>{m.scenario}</TableCell>
               <TableCell numeric>{m.shoppers}</TableCell>
-              <TableCell className="whitespace-normal text-text-2">{m.chaos}</TableCell>
               <TableCell numeric>{m.cost}</TableCell>
               <TableCell numeric>{m.wall}</TableCell>
               <TableCell numeric>{String(m.baseline)}</TableCell>
@@ -212,26 +355,25 @@ export function Measured() {
           ))}
         </TableBody>
       </Table>
-      <p className="mx-auto max-w-measure text-center type-caption text-text-2">Costs are the recorded tokens at OpenRouter list prices; wall time includes the settle phase that fast-forwards the simulated clock to the 24-hour SLAs. Eight other models and their prices are in the README.</p>
+      </div>
+      <p className="text-center type-caption text-text-2">Recorded tokens at list prices. Eight more models in the README.</p>
     </Section>
   );
 }
 
 const FAQ: Array<[string, string]> = [
-  ["What does Swarm do?", "It points LLM shoppers, a merchant agent and a chaos agent at a PayPal sandbox store, records every agent turn and PayPal call as an event, and scores the run 0 to 100 across discoverability, transactability, fulfilment and resilience. Each finding names the fix."],
-  ["Does any real money move?", "No. Everything runs against the PayPal sandbox with test cards, and without credentials PayPal calls go to an in-process mock with the same tool names and error codes. Every report states which mode it ran in."],
-  ["How much does a run cost?", "Between $0.007 and $0.06 on Claude Haiku 5.5 for the four shipped scenarios, measured on 9 Nov 2026. The plan shows the estimate before anything is spent and the run refuses to start over its token cap."],
-  ["What is simulated and what is real?", "Orders, captures, refunds, tracking and disputes are real sandbox objects created through the PayPal Agent Toolkit and Server SDK. Buyer approval is a card confirm, chargebacks come from the sandbox-only endpoint, and the clock runs one simulated hour per real minute so 24-hour SLAs fire inside a five-minute run."],
-  ["Which models can drive the agents?", "Any OpenRouter model id. The default is Claude Haiku 5.5 for every agent; the README compares eight models from gpt-oss-120b at $0.002 a run to Opus 5.5 at $0.74. Scripted agents cost nothing and are used for the smoke test."],
-  ["Can I run it against my own store?", "Yes. Open the settings, switch on bring your own keys, and paste a sandbox client id and secret. They are encrypted at rest and never written to an event. Register the api URL as a sandbox webhook and the ticker shows every webhook with its lag."],
-  ["What stops a run from draining my key?", "Three levels of caps checked before every model call: per-turn output tokens, per-actor budgets and a per-run cap you can edit. At 80 percent no new shoppers are admitted; at 100 percent the run drains and still renders its report."],
-  ["Where is the code?", "On GitHub under an MIT licence: a pnpm monorepo with the api, the web app and the core, paypal, agents and db packages, plus the benchmark results behind the numbers on this page."],
+  ["Does any real money move?", "No. Everything runs on the PayPal sandbox with test cards. Without credentials, PayPal calls go to a mock with the same tool names and error codes."],
+  ["How much does a run cost?", "$0.007 to $0.06 on Claude Haiku 5.5. You see the estimate before anything is spent, and a run refuses to start over its cap."],
+  ["What is real and what is simulated?", "Orders, captures, refunds, tracking and disputes are real sandbox objects. Buyer approval is a card confirm, and one real minute is one simulated hour, so 24-hour SLAs fire inside a five-minute run."],
+  ["Which models?", "Any OpenRouter model id. Haiku 5.5 by default; the README compares eight, from $0.002 to $0.74 a run."],
+  ["What stops a run from draining my key?", "Caps checked before every model call: per turn, per shopper, per run. At 80 percent no new shoppers start; at 100 percent the run drains and still writes its report."],
+  ["Where is the code?", "On GitHub under MIT: the api, the web app, the core, paypal, agents and db packages, and the benchmark results behind these numbers."],
 ];
 
 export function Questions() {
   return (
     <Section>
-      <Heading title="Questions before you release one" />
+      <Heading title="Questions" />
       <CollapsibleGroup variant="framed" className="mx-auto w-full max-w-3xl">
         {FAQ.map(([q, a]) => (
           <Collapsible key={q}>
@@ -242,23 +384,6 @@ export function Questions() {
           </Collapsible>
         ))}
       </CollapsibleGroup>
-    </Section>
-  );
-}
-
-export function Closing({ onSettings }: { onSettings: () => void }) {
-  return (
-    <Section className="items-center text-center">
-      <Heading title="Release a swarm you would learn from.">Describe it in a sentence. Nothing is spent until you confirm.</Heading>
-      <div className="flex flex-wrap justify-center gap-2">
-        <Button onClick={focusLauncher}>
-          <Icon icon={Play} />
-          Release the swarm
-        </Button>
-        <Button variant="secondary" onClick={onSettings}>
-          Open settings
-        </Button>
-      </div>
     </Section>
   );
 }
@@ -304,7 +429,7 @@ export function SiteFooter() {
             <img src="/logo.svg" alt="" width={28} height={28} className="size-7 shrink-0" />
             paypal-swarm
           </span>
-          <p className="max-w-measure-hint type-body-sm text-text-2">An agentic-commerce flight simulator for PayPal merchants. Sandbox only; no real money moves.</p>
+          <p className="max-w-measure-hint type-body-sm text-text-2">A flight simulator for agentic commerce. Sandbox only; no real money moves.</p>
         </div>
         {FOOTER.map((col) => (
           <nav key={col.title} aria-label={col.title} className="flex flex-col gap-3">
@@ -330,7 +455,7 @@ export function SiteFooter() {
       <div className="border-t border-line-faint">
         <div className="flex w-full flex-wrap items-center justify-between gap-2 px-6 py-4">
           <span className="type-caption text-text-3">Built for the PayPal AI Hackathon, November 2026.</span>
-          <span className="flex items-center gap-4 type-caption text-text-3">
+          <span className="flex flex-wrap items-center gap-4 type-caption text-text-3">
             <span className="flex items-center gap-1">
               <Icon icon={Code} size={14} /> MIT
             </span>

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtTokens, fmtUsd, type Estimate, type Modes, type PlanResult, type RunConfigInput, type RunListItem, type ScenariosResponse } from "@/lib/api";
 import { ErrorAlert, ModeTags, RunStatus, ScenarioListSkeleton, ValueSkeleton } from "@/components/ui";
 import { SwarmLauncher } from "@/components/SwarmLauncher";
-import { Closing, Engine, Measured, Paths, Questions, StackStrip } from "@/components/Landing";
+import { Engine, Measured, Paths, Questions, StackStrip } from "@/components/Landing";
 import { ArrowUpRight, Icon, Information } from "@/components/sodium/icon";
 import { Button } from "@/components/sodium/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
@@ -174,7 +174,7 @@ export default function SetupPage() {
       <section id="launch" className="mx-auto flex w-full max-w-3xl scroll-mt-6 flex-col gap-8 py-10 lg:py-16">
         <div className="flex flex-col items-center gap-4 text-center">
           <h1 className="type-display text-text-1">Stress-test your checkout with a swarm of AI shoppers</h1>
-          <p className="max-w-measure type-body text-text-2">Describe the crowd in a sentence. LLM shoppers, a merchant agent and a chaos agent hit your PayPal sandbox store, and you get a readiness score with the fix behind every finding.</p>
+          <p className="max-w-measure type-body text-text-2">One sentence releases LLM shoppers and a chaos agent on your PayPal sandbox. You get a score and the fix behind every finding.</p>
           <Button variant="ghost" size="sm" onClick={() => setAbout(true)}>
             <Icon icon={Information} />
             How it works
@@ -466,8 +466,7 @@ export default function SetupPage() {
 
       <section className="flex w-full flex-col gap-10 border-t border-line py-14 lg:py-20" aria-labelledby="recent-runs">
         <div className="mx-auto flex max-w-measure flex-col items-center gap-3 text-center">
-          <h2 id="recent-runs" className="type-heading text-text-1">If you would rather read first, open a finished run.</h2>
-          <p className="type-body text-text-2">The latest runs on this api, with their scores. Each opens on its Arena; the report and the Studio are one click further.</p>
+          <h2 id="recent-runs" className="type-heading text-text-1">Or open a finished run.</h2>
         </div>
         {runs === null ? (
           <ul className="grid gap-px border border-line bg-line sm:grid-cols-3" aria-busy>
@@ -523,7 +522,6 @@ export default function SetupPage() {
       </section>
 
       <Questions />
-      <Closing onSettings={() => setSettings(true)} />
     </>
   );
 }
