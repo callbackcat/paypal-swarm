@@ -12,3 +12,9 @@ coverage/
 Thumbs.db
 scripts/.spike-last.json
 *.tsbuildinfo
+
+# design.how skills installed at the repo root by `npx skills add`; the tracked copy lives in apps/web and these are absolute symlinks to it
+/.agents/
+/.kiro/
+/.claude/skills/
+/skills-lock.json

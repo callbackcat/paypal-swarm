@@ -2,38 +2,119 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, fmtTokens, fmtUsd, type Estimate, type Modes, type PlanResult, type RunConfigInput, type RunListItem, type ScenariosResponse } from "@/lib/api";
-import { ErrorAlert, ModeTags, RunStatus, ScenarioListSkeleton, ValueSkeleton } from "@/components/ui";
+import {
+  api,
+  fmtTokens,
+  fmtUsd,
+  type Estimate,
+  type Modes,
+  type PlanResult,
+  type RunConfigInput,
+  type RunListItem,
+  type ScenariosResponse,
+} from "@/lib/api";
+import {
+  ErrorAlert,
+  ModeTags,
+  RunStatus,
+  ScenarioListSkeleton,
+  ValueSkeleton,
+} from "@/components/ui";
 import { SwarmLauncher } from "@/components/SwarmLauncher";
-import { Engine, Measured, Paths, Questions, StackStrip } from "@/components/Landing";
+import {
+  Engine,
+  Measured,
+  Paths,
+  Questions,
+  StackStrip,
+} from "@/components/Landing";
 import { ArrowUpRight, Icon, Information } from "@/components/sodium/icon";
 import { Button } from "@/components/sodium/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
-import { DataList, DataListItem, DataListLabel, DataListValue } from "@/components/sodium/ui/data-list";
-import { Dialog, DialogAction, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/sodium/ui/dialog";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/sodium/ui/field";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/sodium/ui/collapsible";
+import {
+  DataList,
+  DataListItem,
+  DataListLabel,
+  DataListValue,
+} from "@/components/sodium/ui/data-list";
+import {
+  Dialog,
+  DialogAction,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/sodium/ui/dialog";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+} from "@/components/sodium/ui/field";
 import { Input } from "@/components/sodium/ui/input";
-import { RadioGroup, RadioGroupOption } from "@/components/sodium/ui/radio-group";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/sodium/ui/select";
+import {
+  RadioGroup,
+  RadioGroupOption,
+} from "@/components/sodium/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/sodium/ui/select";
 import { Status } from "@/components/sodium/ui/status";
 import { Switch } from "@/components/sodium/ui/switch";
 import { Tag } from "@/components/sodium/ui/tag";
 
-const PROFILES: Array<{ id: "baseline" | "hardened"; label: string; blurb: string }> = [
-  { id: "baseline", label: "Baseline merchant", blurb: "Captures on every approval, treats HTTP 200 as paid, ships only when asked and ignores disputes until prompted. The way most first agents are wired." },
-  { id: "hardened", label: "Hardened merchant", blurb: "Per-order capture lock with PayPal-Request-Id, reads the capture status, auto-tracking, refund clamping, dispute SLA and human approval above the threshold." },
+const PROFILES: Array<{
+  id: "baseline" | "hardened";
+  label: string;
+  blurb: string;
+}> = [
+  {
+    id: "baseline",
+    label: "Baseline merchant",
+    blurb:
+      "Captures on every approval, treats HTTP 200 as paid, ships only when asked and ignores disputes until prompted. The way most first agents are wired.",
+  },
+  {
+    id: "hardened",
+    label: "Hardened merchant",
+    blurb:
+      "Per-order capture lock with PayPal-Request-Id, reads the capture status, auto-tracking, refund clamping, dispute SLA and human approval above the threshold.",
+  },
 ];
 /** OpenRouter ids with USD per million input/output tokens, as listed on 8 Nov 2026. "" keeps the server's SWARM_MODEL_* defaults. */
 const MODEL_ITEMS = [
   { value: "default", label: "Server default" },
-  { value: "anthropic/claude-haiku-5.5", label: "Claude Haiku 5.5 · $0.10 / $0.50" },
-  { value: "anthropic/claude-sonnet-5.5", label: "Claude Sonnet 5.5 · $2 / $10" },
+  {
+    value: "anthropic/claude-haiku-5.5",
+    label: "Claude Haiku 5.5 · $0.10 / $0.50",
+  },
+  {
+    value: "anthropic/claude-sonnet-5.5",
+    label: "Claude Sonnet 5.5 · $2 / $10",
+  },
   { value: "anthropic/claude-opus-5.5", label: "Claude Opus 5.5 · $4 / $20" },
   { value: "openai/gpt-5.5", label: "GPT-5.5 · $5 / $30" },
   { value: "openai/gpt-5.1", label: "GPT-5.1 · $1.25 / $10" },
-  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite · $0.10 / $0.40" },
+  {
+    value: "google/gemini-2.5-flash-lite",
+    label: "Gemini 2.5 Flash Lite · $0.10 / $0.40",
+  },
   { value: "openai/gpt-6-luna", label: "GPT-6 Luna · $0.10 / $0.50" },
-  { value: "deepseek/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash · $0.05 / $0.57" },
+  {
+    value: "deepseek/deepseek-v4.1-flash",
+    label: "DeepSeek V4.1 Flash · $0.05 / $0.57",
+  },
   { value: "openai/gpt-oss-120b", label: "gpt-oss-120b · $0.02 / $0.07" },
   { value: "qwen/qwen3.7-flash", label: "Qwen 3.7 Flash · $0.03 / $0.13" },
 ];
@@ -50,10 +131,22 @@ const PAYPAL_ITEMS = [
 const DEFAULT_SCENARIO = "black-friday";
 /** The long form of the three steps, for the How it works dialog. */
 const ABOUT: Array<[string, string]> = [
-  ["Describe", "One sentence: who the shoppers are, what to break, which merchant. A preset works too. A model turns it into a plan; keywords do when no model is available."],
-  ["Confirm", "The plan shows the scenario, the merchant profile, the shoppers, the model and the estimated cost before anything is spent. Hard caps stop a runaway run: per-turn output tokens, per-actor caps, an admission stop at 80 percent and a scripted fallback at 100 percent."],
-  ["Watch, then read", "The Arena streams every agent turn and PayPal call live, with the order board, the webhook ticker and human approvals. The Report scores the run 0 to 100 across four dimensions and names the fix behind each finding; the Studio is the deep dive. Re-run with the hardened merchant and watch the score move."],
-  ["What is simulated", "Buyer approval is a card confirm in the sandbox, chargebacks come from the sandbox-only endpoint, and without credentials PayPal calls go to an in-process mock with the same tool names and error codes. Every report states its modes."],
+  [
+    "Describe",
+    "One sentence: who the shoppers are, what to break, which merchant. A preset works too. A model turns it into a plan; keywords do when no model is available.",
+  ],
+  [
+    "Confirm",
+    "The plan shows the scenario, the merchant profile, the shoppers, the model and the estimated cost before anything is spent. Hard caps stop a runaway run: per-turn output tokens, per-actor caps, an admission stop at 80 percent and a scripted fallback at 100 percent.",
+  ],
+  [
+    "Watch, then read",
+    "The Arena streams every agent turn and PayPal call live, with the order board, the webhook ticker and human approvals. The Report scores the run 0 to 100 across four dimensions and names the fix behind each finding; the Studio is the deep dive. Re-run with the hardened merchant and watch the score move.",
+  ],
+  [
+    "What is simulated",
+    "Buyer approval is a card confirm in the sandbox, chargebacks come from the sandbox-only endpoint, and without credentials PayPal calls go to an in-process mock with the same tool names and error codes. Every report states its modes.",
+  ],
 ];
 
 export default function SetupPage() {
@@ -74,7 +167,12 @@ export default function SetupPage() {
   const [orKey, setOrKey] = useState("");
   const [ppId, setPpId] = useState("");
   const [ppSecret, setPpSecret] = useState("");
-  const [estimate, setEstimate] = useState<{ estimate: Estimate; modes: Modes; tokenCap: number; shoppers: number } | null>(null);
+  const [estimate, setEstimate] = useState<{
+    estimate: Estimate;
+    modes: Modes;
+    tokenCap: number;
+    shoppers: number;
+  } | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [starting, setStarting] = useState(false);
   const [guardrails, setGuardrails] = useState(false);
@@ -89,7 +187,11 @@ export default function SetupPage() {
       .scenarios()
       .then((d) => {
         setData(d);
-        if (!d.scenarios.some((s) => s.id === DEFAULT_SCENARIO && s.status === "ready")) {
+        if (
+          !d.scenarios.some(
+            (s) => s.id === DEFAULT_SCENARIO && s.status === "ready",
+          )
+        ) {
           const first = d.scenarios.find((s) => s.status === "ready");
           if (first) setScenario(first.id);
         }
@@ -106,16 +208,42 @@ export default function SetupPage() {
 
   const current = data?.scenarios.find((s) => s.id === scenario);
   const config = useMemo<RunConfigInput>(() => {
-    const cfg: RunConfigInput = { scenario, merchantProfile: profile, llm, paypal, approvalThresholdUsd: Number(threshold) || 50 };
-    if (model !== "default") cfg.models = { shopper: model, merchant: model, analyst: model };
+    const cfg: RunConfigInput = {
+      scenario,
+      merchantProfile: profile,
+      llm,
+      paypal,
+      approvalThresholdUsd: Number(threshold) || 50,
+    };
+    if (model !== "default")
+      cfg.models = { shopper: model, merchant: model, analyst: model };
     if (shoppers) cfg.shoppers = Number(shoppers);
     if (tokenCap) cfg.tokenCap = Number(tokenCap);
     if (brief.trim()) cfg.brief = brief.trim();
     if (runName.trim()) cfg.name = runName.trim();
     if (byo && orKey.trim()) cfg.openrouterApiKey = orKey.trim();
-    if (byo && ppId.trim() && ppSecret.trim()) cfg.credentials = { clientId: ppId.trim(), clientSecret: ppSecret.trim() };
+    if (byo && ppId.trim() && ppSecret.trim())
+      cfg.credentials = {
+        clientId: ppId.trim(),
+        clientSecret: ppSecret.trim(),
+      };
     return cfg;
-  }, [scenario, profile, llm, paypal, model, threshold, shoppers, tokenCap, byo, orKey, ppId, ppSecret, brief, runName]);
+  }, [
+    scenario,
+    profile,
+    llm,
+    paypal,
+    model,
+    threshold,
+    shoppers,
+    tokenCap,
+    byo,
+    orKey,
+    ppId,
+    ppSecret,
+    brief,
+    runName,
+  ]);
 
   useEffect(() => {
     if (!current || current.status !== "ready") return;
@@ -141,8 +269,13 @@ export default function SetupPage() {
     try {
       const run = await api.createRun(config);
       if (both) {
-        const other = config.merchantProfile === "hardened" ? "baseline" : "hardened";
-        await api.createRun({ ...config, merchantProfile: other, name: `${config.name ?? current?.name ?? scenario} ${other}` });
+        const other =
+          config.merchantProfile === "hardened" ? "baseline" : "hardened";
+        await api.createRun({
+          ...config,
+          merchantProfile: other,
+          name: `${config.name ?? current?.name ?? scenario} ${other}`,
+        });
       }
       router.push(`/runs/${run.id}`);
     } catch (e) {
@@ -154,10 +287,19 @@ export default function SetupPage() {
   /** The launcher read a plan: put it into the form so the estimate and every field follow it. */
   function applyPlan(r: PlanResult) {
     const { plan } = r;
-    if (data?.scenarios.some((s) => s.id === plan.scenario && s.status === "ready")) setScenario(plan.scenario);
+    if (
+      data?.scenarios.some(
+        (s) => s.id === plan.scenario && s.status === "ready",
+      )
+    )
+      setScenario(plan.scenario);
     setProfile(plan.merchantProfile);
     setShoppers(plan.shoppers ? String(plan.shoppers) : "");
-    setModel(plan.model && MODEL_ITEMS.some((m) => m.value === plan.model) ? plan.model : "default");
+    setModel(
+      plan.model && MODEL_ITEMS.some((m) => m.value === plan.model)
+        ? plan.model
+        : "default",
+    );
     setBrief(plan.brief ?? "");
     setRunName(plan.name);
   }
@@ -165,23 +307,56 @@ export default function SetupPage() {
   const est = estimate?.estimate;
   const overCap = !!est?.overCap;
   const ready = (data?.scenarios ?? []).filter((s) => s.status === "ready");
-  const canStart = !starting && !overCap && !!current && current.status === "ready";
-  const blocker = starting ? null : overCap ? "over the token cap: lower the shoppers or pick a cheaper model" : !current ? (error ? "the api is not reachable" : "loading scenarios") : current.status !== "ready" ? "this scenario is not runnable yet" : null;
-  const estimateLine = !current ? null : estimating || !est ? null : est.tokens === 0 ? "scripted agents, zero tokens" : `${fmtTokens(est.tokens)} tokens, about ${fmtUsd(est.usd, 3)}`;
+  const canStart =
+    !starting && !overCap && !!current && current.status === "ready";
+  const blocker = starting
+    ? null
+    : overCap
+      ? "over the token cap: lower the shoppers or pick a cheaper model"
+      : !current
+        ? error
+          ? "the api is not reachable"
+          : "loading scenarios"
+        : current.status !== "ready"
+          ? "this scenario is not runnable yet"
+          : null;
+  const estimateLine = !current
+    ? null
+    : estimating || !est
+      ? null
+      : est.tokens === 0
+        ? "scripted agents, zero tokens"
+        : `${fmtTokens(est.tokens)} tokens, about ${fmtUsd(est.usd, 3)}`;
 
   return (
-    <>
-      <section id="launch" className="mx-auto flex w-full max-w-3xl scroll-mt-6 flex-col gap-8 py-10 lg:py-16">
+    <div className="flex w-full flex-col">
+      <section
+        id="launch"
+        className="mx-auto flex w-full max-w-3xl scroll-mt-6 flex-col gap-8 py-12 lg:py-16"
+      >
         <div className="flex flex-col items-center gap-4 text-center">
-          <h1 className="type-display text-text-1">Stress-test your checkout with a swarm of AI shoppers</h1>
-          <p className="max-w-measure type-body text-text-2">One sentence releases LLM shoppers and a chaos agent on your PayPal sandbox. You get a score and the fix behind every finding.</p>
+          <h1 className="type-display text-text-1">
+            Stress-test your checkout with a swarm of AI shoppers
+          </h1>
+          <p className="max-w-measure type-body text-text-2">
+            One sentence releases LLM shoppers and a chaos agent on your PayPal
+            sandbox. You get a score and the fix behind every finding.
+          </p>
           <Button variant="ghost" size="sm" onClick={() => setAbout(true)}>
             <Icon icon={Information} />
             How it works
           </Button>
         </div>
         <ErrorAlert error={error} />
-        <SwarmLauncher scenarios={data?.scenarios ?? null} onPlan={applyPlan} onRelease={(both) => void start(both)} onSettings={() => setSettings(true)} estimateLine={estimateLine} starting={starting} blocker={blocker} />
+        <SwarmLauncher
+          scenarios={data?.scenarios ?? null}
+          onPlan={applyPlan}
+          onRelease={(both) => void start(both)}
+          onSettings={() => setSettings(true)}
+          estimateLine={estimateLine}
+          starting={starting}
+          blocker={blocker}
+        />
       </section>
 
       <StackStrip />
@@ -195,11 +370,17 @@ export default function SetupPage() {
             <DialogTitle>how a run works</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <DialogDescription>Swarm finds the gaps an agent that shops for a human would hit at your checkout, on a sandbox, for cents. Nothing touches a real PayPal account unless you give it sandbox credentials.</DialogDescription>
+            <DialogDescription>
+              Swarm finds the gaps an agent that shops for a human would hit at
+              your checkout, on a sandbox, for cents. Nothing touches a real
+              PayPal account unless you give it sandbox credentials.
+            </DialogDescription>
             <ol className="mt-4 flex flex-col divide-y divide-line-faint">
               {ABOUT.map(([title, body], i) => (
                 <li key={title} className="flex gap-4 py-3">
-                  <span className="type-label text-text-3">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="type-label text-text-3">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
                   <span className="flex flex-col gap-1">
                     <span className="type-body text-text-1">{title}</span>
                     <span className="type-body-sm text-text-2">{body}</span>
@@ -221,27 +402,52 @@ export default function SetupPage() {
             <DialogTitle>run settings</DialogTitle>
           </DialogHeader>
           <DialogBody>
-            <DialogDescription>Everything the plan set, open to change. The estimate in the footer follows every change.</DialogDescription>
+            <DialogDescription>
+              Everything the plan set, open to change. The estimate in the
+              footer follows every change.
+            </DialogDescription>
             <div className="mt-2 flex flex-col divide-y divide-line">
-              <section className="flex flex-col gap-3 py-4" aria-label="Scenario">
+              <section
+                className="flex flex-col gap-3 py-4"
+                aria-label="Scenario"
+              >
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className="type-label text-text-2">Scenario</h3>
-                  {data ? <span className="type-code-sm text-text-3">{`${ready.length} ready`}</span> : error ? <span className="type-code-sm text-text-3">unavailable</span> : <ValueSkeleton type="code-sm" width="w-16" />}
+                  {data ? (
+                    <span className="type-code-sm text-text-3">{`${ready.length} ready`}</span>
+                  ) : error ? (
+                    <span className="type-code-sm text-text-3">
+                      unavailable
+                    </span>
+                  ) : (
+                    <ValueSkeleton type="code-sm" width="w-16" />
+                  )}
                 </div>
                 {data ? (
-                  <RadioGroup value={scenario} onValueChange={(v) => setScenario(String(v))} aria-label="Scenario">
+                  <RadioGroup
+                    value={scenario}
+                    onValueChange={(v) => setScenario(String(v))}
+                    aria-label="Scenario"
+                  >
                     {data.scenarios.map((sc) => (
                       <RadioGroupOption
                         key={sc.id}
                         value={sc.id}
                         disabled={sc.status !== "ready"}
                         label={sc.name}
-                        description={sc.status === "ready" ? `${sc.tagline} ${sc.shoppers} shoppers over ${sc.durationMin} simulated minutes.` : `${sc.tagline} Coming later; not runnable yet.`}
+                        description={
+                          sc.status === "ready"
+                            ? `${sc.tagline} ${sc.shoppers} shoppers over ${sc.durationMin} simulated minutes.`
+                            : `${sc.tagline} Coming later; not runnable yet.`
+                        }
                       />
                     ))}
                   </RadioGroup>
                 ) : error ? (
-                  <p className="type-body-sm text-text-2">Scenarios could not be loaded. Fix the api connection and reload.</p>
+                  <p className="type-body-sm text-text-2">
+                    Scenarios could not be loaded. Fix the api connection and
+                    reload.
+                  </p>
                 ) : (
                   <ScenarioListSkeleton />
                 )}
@@ -249,7 +455,9 @@ export default function SetupPage() {
                   <div className="flex flex-col gap-1">
                     {current.chaosDescription.length > 0 ? (
                       <>
-                        <p className="type-caption text-text-2">What the chaos agent injects into {current.name}:</p>
+                        <p className="type-caption text-text-2">
+                          What the chaos agent injects into {current.name}:
+                        </p>
                         <ul className="flex flex-col gap-1 type-body-sm text-text-1">
                           {current.chaosDescription.map((c, i) => (
                             <li key={i}>{c}</li>
@@ -257,53 +465,128 @@ export default function SetupPage() {
                         </ul>
                       </>
                     ) : (
-                      <p className="type-caption text-text-2">No chaos in this scenario: a clean baseline to compare against.</p>
+                      <p className="type-caption text-text-2">
+                        No chaos in this scenario: a clean baseline to compare
+                        against.
+                      </p>
                     )}
                   </div>
                 )}
               </section>
 
-              <section className="flex flex-col gap-3 py-4" aria-label="Merchant profile">
+              <section
+                className="flex flex-col gap-3 py-4"
+                aria-label="Merchant profile"
+              >
                 <h3 className="type-label text-text-2">Merchant profile</h3>
-                <RadioGroup value={profile} onValueChange={(v) => setProfile(v as "baseline" | "hardened")} aria-label="Merchant profile">
+                <RadioGroup
+                  value={profile}
+                  onValueChange={(v) =>
+                    setProfile(v as "baseline" | "hardened")
+                  }
+                  aria-label="Merchant profile"
+                >
                   {PROFILES.map((pr) => (
-                    <RadioGroupOption key={pr.id} value={pr.id} label={pr.label} description={pr.blurb} />
+                    <RadioGroupOption
+                      key={pr.id}
+                      value={pr.id}
+                      label={pr.label}
+                      description={pr.blurb}
+                    />
                   ))}
                 </RadioGroup>
-                <p className="type-caption text-text-2">Run baseline first, read the report, then re-run the same scenario against the hardened profile. Both are prompt plus code, so findings reproduce.</p>
+                <p className="type-caption text-text-2">
+                  Run baseline first, read the report, then re-run the same
+                  scenario against the hardened profile. Both are prompt plus
+                  code, so findings reproduce.
+                </p>
               </section>
 
-              <section className="flex flex-col gap-4 py-4" aria-label="Options">
+              <section
+                className="flex flex-col gap-4 py-4"
+                aria-label="Options"
+              >
                 <h3 className="type-label text-text-2">Options</h3>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field>
                     <FieldLabel>Shoppers</FieldLabel>
-                    <Input mono inputMode="numeric" placeholder={String(current?.shoppers ?? "")} value={shoppers} onChange={(e) => setShoppers(e.target.value.replace(/D/g, ""))} />
-                    <FieldDescription>Blank keeps the scenario default.</FieldDescription>
+                    <Input
+                      mono
+                      inputMode="numeric"
+                      placeholder={String(current?.shoppers ?? "")}
+                      value={shoppers}
+                      onChange={(e) =>
+                        setShoppers(e.target.value.replace(/D/g, ""))
+                      }
+                    />
+                    <FieldDescription>
+                      Blank keeps the scenario default.
+                    </FieldDescription>
                   </Field>
                   <Field>
                     <FieldLabel>Run token cap</FieldLabel>
-                    <Input mono inputMode="numeric" placeholder={String(current?.tokenCap ?? "")} value={tokenCap} onChange={(e) => setTokenCap(e.target.value.replace(/D/g, ""))} />
-                    <FieldDescription>Swarm refuses to start over the cap.</FieldDescription>
+                    <Input
+                      mono
+                      inputMode="numeric"
+                      placeholder={String(current?.tokenCap ?? "")}
+                      value={tokenCap}
+                      onChange={(e) =>
+                        setTokenCap(e.target.value.replace(/D/g, ""))
+                      }
+                    />
+                    <FieldDescription>
+                      Swarm refuses to start over the cap.
+                    </FieldDescription>
                   </Field>
                   <Field className="sm:col-span-2">
                     <FieldLabel>Shopper brief</FieldLabel>
-                    <Input placeholder="Who the shoppers are this run and what to try to break" value={brief} onChange={(e) => setBrief(e.target.value)} maxLength={600} />
-                    <FieldDescription>Handed to every shopper in character. The launcher fills it from your sentence.</FieldDescription>
+                    <Input
+                      placeholder="Who the shoppers are this run and what to try to break"
+                      value={brief}
+                      onChange={(e) => setBrief(e.target.value)}
+                      maxLength={600}
+                    />
+                    <FieldDescription>
+                      Handed to every shopper in character. The launcher fills
+                      it from your sentence.
+                    </FieldDescription>
                   </Field>
                   <Field>
                     <FieldLabel>Run name</FieldLabel>
-                    <Input placeholder={current?.name ?? ""} value={runName} onChange={(e) => setRunName(e.target.value)} maxLength={60} />
-                    <FieldDescription>Blank names it after the scenario.</FieldDescription>
+                    <Input
+                      placeholder={current?.name ?? ""}
+                      value={runName}
+                      onChange={(e) => setRunName(e.target.value)}
+                      maxLength={60}
+                    />
+                    <FieldDescription>
+                      Blank names it after the scenario.
+                    </FieldDescription>
                   </Field>
                   <Field>
                     <FieldLabel>Approval above</FieldLabel>
-                    <Input mono inputMode="decimal" value={threshold} onChange={(e) => setThreshold(e.target.value.replace(/[^d.]/g, ""))} trailing={<span className="type-code-sm text-text-2">USD</span>} />
-                    <FieldDescription>Refunds above it pause for a human.</FieldDescription>
+                    <Input
+                      mono
+                      inputMode="decimal"
+                      value={threshold}
+                      onChange={(e) =>
+                        setThreshold(e.target.value.replace(/[^d.]/g, ""))
+                      }
+                      trailing={
+                        <span className="type-code-sm text-text-2">USD</span>
+                      }
+                    />
+                    <FieldDescription>
+                      Refunds above it pause for a human.
+                    </FieldDescription>
                   </Field>
                   <Field>
                     <FieldLabel>Agents</FieldLabel>
-                    <Select items={LLM_ITEMS} value={llm} onValueChange={(v) => v && setLlm(v as typeof llm)}>
+                    <Select
+                      items={LLM_ITEMS}
+                      value={llm}
+                      onValueChange={(v) => v && setLlm(v as typeof llm)}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Pick who drives the agents" />
                       </SelectTrigger>
@@ -319,7 +602,11 @@ export default function SetupPage() {
                   {llm !== "scripted" && (
                     <Field>
                       <FieldLabel>Model</FieldLabel>
-                      <Select items={MODEL_ITEMS} value={model} onValueChange={(v) => v && setModel(v)}>
+                      <Select
+                        items={MODEL_ITEMS}
+                        value={model}
+                        onValueChange={(v) => v && setModel(v)}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Pick the model for every agent" />
                         </SelectTrigger>
@@ -331,12 +618,19 @@ export default function SetupPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <FieldDescription>One OpenRouter model for shoppers, merchant and analyst. Prices are USD per million tokens in and out.</FieldDescription>
+                      <FieldDescription>
+                        One OpenRouter model for shoppers, merchant and analyst.
+                        Prices are USD per million tokens in and out.
+                      </FieldDescription>
                     </Field>
                   )}
                   <Field>
                     <FieldLabel>PayPal</FieldLabel>
-                    <Select items={PAYPAL_ITEMS} value={paypal} onValueChange={(v) => v && setPaypal(v as typeof paypal)}>
+                    <Select
+                      items={PAYPAL_ITEMS}
+                      value={paypal}
+                      onValueChange={(v) => v && setPaypal(v as typeof paypal)}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Pick where PayPal calls go" />
                       </SelectTrigger>
@@ -352,24 +646,47 @@ export default function SetupPage() {
                   <Field orientation="horizontal">
                     <FieldContent>
                       <FieldLabel>Bring your own keys</FieldLabel>
-                      <FieldDescription>Encrypted at rest, never written to events.</FieldDescription>
+                      <FieldDescription>
+                        Encrypted at rest, never written to events.
+                      </FieldDescription>
                     </FieldContent>
-                    <Switch checked={byo} onCheckedChange={(c) => setByo(!!c)} />
+                    <Switch
+                      checked={byo}
+                      onCheckedChange={(c) => setByo(!!c)}
+                    />
                   </Field>
                 </div>
                 {byo && (
                   <div className="grid gap-4 sm:grid-cols-3">
                     <Field>
                       <FieldLabel>OpenRouter API key</FieldLabel>
-                      <Input mode="password" mono autoComplete="off" placeholder="sk-or-" value={orKey} onChange={(e) => setOrKey(e.target.value)} />
+                      <Input
+                        mode="password"
+                        mono
+                        autoComplete="off"
+                        placeholder="sk-or-"
+                        value={orKey}
+                        onChange={(e) => setOrKey(e.target.value)}
+                      />
                     </Field>
                     <Field>
                       <FieldLabel>PayPal sandbox client id</FieldLabel>
-                      <Input mono autoComplete="off" value={ppId} onChange={(e) => setPpId(e.target.value)} />
+                      <Input
+                        mono
+                        autoComplete="off"
+                        value={ppId}
+                        onChange={(e) => setPpId(e.target.value)}
+                      />
                     </Field>
                     <Field>
                       <FieldLabel>PayPal sandbox secret</FieldLabel>
-                      <Input mode="password" mono autoComplete="off" value={ppSecret} onChange={(e) => setPpSecret(e.target.value)} />
+                      <Input
+                        mode="password"
+                        mono
+                        autoComplete="off"
+                        value={ppSecret}
+                        onChange={(e) => setPpSecret(e.target.value)}
+                      />
                     </Field>
                   </div>
                 )}
@@ -377,7 +694,14 @@ export default function SetupPage() {
 
               <section className="flex flex-col py-2" aria-label="Allow-lists">
                 <Collapsible open={guardrails} onOpenChange={setGuardrails}>
-                  <CollapsibleTrigger size="sm" summary={data ? `${Object.keys(data.allowlists).length} agents` : undefined}>
+                  <CollapsibleTrigger
+                    size="sm"
+                    summary={
+                      data
+                        ? `${Object.keys(data.allowlists).length} agents`
+                        : undefined
+                    }
+                  >
                     Allow-lists
                   </CollapsibleTrigger>
                   <CollapsibleContent>
@@ -385,18 +709,28 @@ export default function SetupPage() {
                       <div className="grid gap-4 py-3 sm:grid-cols-2">
                         {Object.entries(data.allowlists).map(([agent, al]) => (
                           <div key={agent} className="flex flex-col gap-2">
-                            <span className="type-label-sm text-text-2">{agent} agent</span>
-                            <p className="type-caption text-text-2">PayPal Agent Toolkit tools this agent can call. Everything else is not in its tool list.</p>
+                            <span className="type-label-sm text-text-2">
+                              {agent} agent
+                            </span>
+                            <p className="type-caption text-text-2">
+                              PayPal Agent Toolkit tools this agent can call.
+                              Everything else is not in its tool list.
+                            </p>
                             {al.tools.length > 0 ? (
                               <ul className="flex flex-wrap gap-x-3 gap-y-1">
                                 {al.tools.map((t) => (
-                                  <li key={t} className="type-code-sm text-text-1">
+                                  <li
+                                    key={t}
+                                    className="type-code-sm text-text-1"
+                                  >
                                     {t}
                                   </li>
                                 ))}
                               </ul>
                             ) : (
-                              <span className="type-code-sm text-text-3">no PayPal tools</span>
+                              <span className="type-code-sm text-text-3">
+                                no PayPal tools
+                              </span>
                             )}
                           </div>
                         ))}
@@ -406,24 +740,61 @@ export default function SetupPage() {
                 </Collapsible>
               </section>
 
-              <section className="flex flex-col gap-2 py-4" aria-label="Estimate">
+              <section
+                className="flex flex-col gap-2 py-4"
+                aria-label="Estimate"
+              >
                 <h3 className="type-label text-text-2">Estimate</h3>
                 <DataList>
                   <DataListItem>
                     <DataListLabel>Modes</DataListLabel>
-                    <DataListValue>{(estimate?.modes ?? data?.modes) ? <ModeTags modes={estimate?.modes ?? data?.modes ?? null} /> : error ? null : <ValueSkeleton width="w-44" />}</DataListValue>
+                    <DataListValue>
+                      {(estimate?.modes ?? data?.modes) ? (
+                        <ModeTags
+                          modes={estimate?.modes ?? data?.modes ?? null}
+                        />
+                      ) : error ? null : (
+                        <ValueSkeleton width="w-44" />
+                      )}
+                    </DataListValue>
                   </DataListItem>
                   <DataListItem>
                     <DataListLabel>Shoppers</DataListLabel>
-                    <DataListValue>{current ? String(estimate?.shoppers ?? current.shoppers) : error ? null : <ValueSkeleton width="w-8" />}</DataListValue>
+                    <DataListValue>
+                      {current ? (
+                        String(estimate?.shoppers ?? current.shoppers)
+                      ) : error ? null : (
+                        <ValueSkeleton width="w-8" />
+                      )}
+                    </DataListValue>
                   </DataListItem>
                   <DataListItem>
                     <DataListLabel>Tokens</DataListLabel>
-                    <DataListValue>{current ? estimating ? <ValueSkeleton width="w-32" /> : `${fmtTokens(est?.tokens)} / ${fmtTokens(estimate?.tokenCap ?? current.tokenCap)}` : error ? null : <ValueSkeleton width="w-32" />}</DataListValue>
+                    <DataListValue>
+                      {current ? (
+                        estimating ? (
+                          <ValueSkeleton width="w-32" />
+                        ) : (
+                          `${fmtTokens(est?.tokens)} / ${fmtTokens(estimate?.tokenCap ?? current.tokenCap)}`
+                        )
+                      ) : error ? null : (
+                        <ValueSkeleton width="w-32" />
+                      )}
+                    </DataListValue>
                   </DataListItem>
                   <DataListItem>
                     <DataListLabel>Cost</DataListLabel>
-                    <DataListValue>{current ? estimating ? <ValueSkeleton width="w-16" /> : fmtUsd(est?.usd, 3) : error ? null : <ValueSkeleton width="w-16" />}</DataListValue>
+                    <DataListValue>
+                      {current ? (
+                        estimating ? (
+                          <ValueSkeleton width="w-16" />
+                        ) : (
+                          fmtUsd(est?.usd, 3)
+                        )
+                      ) : error ? null : (
+                        <ValueSkeleton width="w-16" />
+                      )}
+                    </DataListValue>
                   </DataListItem>
                   {est &&
                     est.tokens > 0 &&
@@ -436,7 +807,11 @@ export default function SetupPage() {
                   {est && est.tokens > 0 && (
                     <DataListItem>
                       <DataListLabel>Models</DataListLabel>
-                      <DataListValue>{Object.entries(est.models).map(([k, v]) => `${k}=${v}`).join(" ")}</DataListValue>
+                      <DataListValue>
+                        {Object.entries(est.models)
+                          .map(([k, v]) => `${k}=${v}`)
+                          .join(" ")}
+                      </DataListValue>
                     </DataListItem>
                   )}
                 </DataList>
@@ -445,83 +820,133 @@ export default function SetupPage() {
                     <Status status="fail" size="sm">
                       Over cap
                     </Status>{" "}
-                    The estimate exceeds the run cap. Lower the shoppers, pick a cheaper model or raise the cap.
+                    The estimate exceeds the run cap. Lower the shoppers, pick a
+                    cheaper model or raise the cap.
                   </p>
                 ) : est && est.tokens === 0 ? (
-                  <p className="type-caption text-text-2">Scripted agents cost zero tokens. Add an OpenRouter key for live shoppers.</p>
+                  <p className="type-caption text-text-2">
+                    Scripted agents cost zero tokens. Add an OpenRouter key for
+                    live shoppers.
+                  </p>
                 ) : (
-                  <p className="type-caption text-text-2">Hard caps while it runs: per-turn output tokens, per-actor caps, an admission stop at 80 percent and a scripted fallback at 100 percent. Pause or stop any time from the Arena.</p>
+                  <p className="type-caption text-text-2">
+                    Hard caps while it runs: per-turn output tokens, per-actor
+                    caps, an admission stop at 80 percent and a scripted
+                    fallback at 100 percent. Pause or stop any time from the
+                    Arena.
+                  </p>
                 )}
               </section>
             </div>
           </DialogBody>
           <DialogFooter meta={blocker ?? estimateLine ?? undefined}>
             <DialogClose>Close</DialogClose>
-            <DialogAction pendingLabel="Starting" disabled={!canStart} onAction={() => start()}>
+            <DialogAction
+              pendingLabel="Starting"
+              disabled={!canStart}
+              onAction={() => start()}
+            >
               Release the swarm
             </DialogAction>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <section className="flex w-full flex-col gap-10 border-t border-line py-14 lg:py-20" aria-labelledby="recent-runs">
+      <section
+        className="flex w-full flex-col gap-10 border-t border-line py-12 lg:gap-12 lg:py-16"
+        aria-labelledby="recent-runs"
+      >
         <div className="mx-auto flex max-w-measure flex-col items-center gap-3 text-center">
-          <h2 id="recent-runs" className="type-heading text-text-1">Or open a finished run.</h2>
+          <h2 id="recent-runs" className="type-heading text-text-1">
+            Or open a finished run.
+          </h2>
         </div>
-        {runs === null ? (
-          <ul className="grid gap-px border border-line bg-line sm:grid-cols-3" aria-busy>
-            {[0, 1, 2].map((i) => (
-              <li key={i} className="flex flex-col gap-3 bg-page p-inset">
-                <ValueSkeleton width="w-40" />
-                <ValueSkeleton type="code-sm" width="w-24" />
-                <ValueSkeleton width="w-12" />
-              </li>
-            ))}
-          </ul>
-        ) : runs.length ? (
-          <ul className="grid gap-px border border-line bg-line sm:grid-cols-3">
-            {runs.slice(0, 3).map((r) => (
-              <li key={r.id} className="flex flex-col gap-4 bg-page p-inset">
-                <div className="flex flex-col gap-2">
-                  <Link href={`/runs/${r.id}`} className="type-body text-text-1 wrap-anywhere hover:underline">
-                    {r.name}
-                  </Link>
-                  <span className="flex flex-wrap items-center gap-2">
-                    <RunStatus status={r.status} />
-                    <Tag size="sm" variant="outline">
-                      {r.merchantProfile} merchant
-                    </Tag>
-                  </span>
-                </div>
-                <div className="flex items-end justify-between gap-3">
-                  <span className="flex flex-col">
-                    <span className="type-label-sm text-text-2">Readiness</span>
-                    <span className="type-figure text-text-1">{r.score?.score ? String(r.score.score.overall) : "–"}</span>
-                  </span>
-                  <span className="flex gap-2">
-                    <Button variant="secondary" size="sm" render={<Link href={`/runs/${r.id}/report`} />} nativeButton={false}>
-                      Report
-                    </Button>
-                    <Button variant="ghost" size="icon-sm" aria-label="Open the Arena" render={<Link href={`/runs/${r.id}`} />} nativeButton={false}>
-                      <Icon icon={ArrowUpRight} />
-                    </Button>
-                  </span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-center type-body-sm text-text-2">{runsFailed ? "Runs could not be loaded: the api did not answer." : "No runs yet. The first run you release shows up here."}</p>
-        )}
-        <div className="flex justify-center">
-          <Button variant="ghost" size="sm" render={<Link href="/runs" />} nativeButton={false}>
-            All runs
-            <Icon icon={ArrowUpRight} />
-          </Button>
+        <div className="flex flex-col gap-4">
+          {runs === null ? (
+            <ul
+              className="grid gap-px border border-line bg-line sm:grid-cols-3"
+              aria-busy
+            >
+              {[0, 1, 2].map((i) => (
+                <li key={i} className="flex flex-col gap-3 bg-page p-inset">
+                  <ValueSkeleton width="w-40" />
+                  <ValueSkeleton type="code-sm" width="w-24" />
+                  <ValueSkeleton width="w-12" />
+                </li>
+              ))}
+            </ul>
+          ) : runs.length ? (
+            <ul className="grid gap-px border border-line bg-line sm:grid-cols-3">
+              {runs.slice(0, 3).map((r) => (
+                <li key={r.id} className="flex flex-col gap-4 bg-page p-inset">
+                  <div className="flex flex-col gap-2">
+                    <Link
+                      href={`/runs/${r.id}`}
+                      className="type-body text-text-1 wrap-anywhere hover:underline"
+                    >
+                      {r.name}
+                    </Link>
+                    <span className="flex flex-wrap items-center gap-2">
+                      <RunStatus status={r.status} />
+                      <Tag size="sm" variant="outline">
+                        {r.merchantProfile} merchant
+                      </Tag>
+                    </span>
+                  </div>
+                  <div className="flex items-end justify-between gap-3">
+                    <span className="flex flex-col">
+                      <span className="type-label-sm text-text-2">
+                        Readiness
+                      </span>
+                      <span className="type-figure text-text-1">
+                        {r.score?.score ? String(r.score.score.overall) : "–"}
+                      </span>
+                    </span>
+                    <span className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        render={<Link href={`/runs/${r.id}/report`} />}
+                        nativeButton={false}
+                      >
+                        Report
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Open the Arena"
+                        render={<Link href={`/runs/${r.id}`} />}
+                        nativeButton={false}
+                      >
+                        <Icon icon={ArrowUpRight} />
+                      </Button>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-center type-body-sm text-text-2">
+              {runsFailed
+                ? "Runs could not be loaded: the api did not answer."
+                : "No runs yet. The first run you release shows up here."}
+            </p>
+          )}
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              render={<Link href="/runs" />}
+              nativeButton={false}
+            >
+              All runs
+              <Icon icon={ArrowUpRight} />
+            </Button>
+          </div>
         </div>
       </section>
 
       <Questions />
-    </>
+    </div>
   );
 }
