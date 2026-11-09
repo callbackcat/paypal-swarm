@@ -9,7 +9,7 @@ services:
     plan: free
     region: oregon
     rootDir: .
-    buildCommand: corepack enable && corepack prepare pnpm@10.30.3 --activate && pnpm install --frozen-lockfile && pnpm --filter @swarm/db db:migrate
+    buildCommand: corepack enable && corepack prepare pnpm@10.30.3 --activate && pnpm install --frozen-lockfile --prod=false && pnpm --filter @swarm/db db:migrate
     startCommand: pnpm --filter @swarm/api start
     healthCheckPath: /healthz
     autoDeploy: true
@@ -24,11 +24,7 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         value: "*" # tighten to the Vercel URL once you know it, e.g. https://paypal-swarm.vercel.app
-      - key: PUBLIC_API_URL
-        fromService:
-          type: web
-          name: swarm-api
-          property: host
+      # The public URL comes from RENDER_EXTERNAL_URL, which Render sets on every web service.
       - key: DEMO_DAILY_TOKEN_CAP
         value: "1500000"
       - key: SWARM_RUN_TOKEN_CAP
