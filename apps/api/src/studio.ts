@@ -1,4 +1,4 @@
-import { DEFAULT_MODELS, makeLlm, normaliseUsage } from "@swarm/agents";
+import { DEFAULT_MODELS, makeLlm, usageOfResult } from "@swarm/agents";
 import { jsonSchema, streamText, tool, type ModelMessage, type ToolSet } from "ai";
 import { z } from "zod";
 import type { Env } from "./env";
@@ -100,7 +100,7 @@ export async function* studioTurn(input: StudioTurn, deps: { env: Env; manager: 
     yield { type: "RUN_ERROR", message: String((e as Error).message ?? e) };
     return;
   }
-  const usage = normaliseUsage(model, await result.totalUsage, await result.providerMetadata);
+  const usage = usageOfResult(model, { steps: await result.steps, totalUsage: await result.totalUsage, providerMetadata: await result.providerMetadata });
   if (world) {
     world.o.budget.record("studio", usage);
     await world.emit("agent.turn", "analyst", "analyst", { actor: "studio", model, usage, costUsd: usage.costUsd, text: text.slice(0, 300), toolCalls: calls.map((c) => c.name), source: "ag-studio" });

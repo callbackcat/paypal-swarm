@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import { BudgetGuard, estimateRun } from "./budget";
 import { cacheKey, cacheMiddleware, MemoryCacheStore } from "./cache";
 import { startRun, type RunDeps } from "./executor";
-import { costFor, ZERO_USAGE } from "./llm";
+import { costFor, usageOfResult, ZERO_USAGE } from "./llm";
 import { repairToolHistory, unansweredToolCalls, windowHistory } from "./history";
+import { resolveCatalogRef } from "./shopper";
 import { MemoryApprovalGate, MemoryEventSink } from "./world";
 
 const fastDeps = (over: Partial<RunDeps> = {}): RunDeps => ({
@@ -198,4 +199,51 @@ describe("executor (mock PayPal, scripted agents)", () => {
     expect(ev.some((e) => e.type === "approval.denied" && e.payload.decision === "timeout")).toBe(true);
     expect(res.report).toBeTruthy();
   }, 45_000);
+});
+
+describe("catalog reference resolver", () => {
+  const view = [
+    { id: "PROD-AAA111", name: "Trailhead Merino Socks (2-pack)" },
+    { id: "PROD-BBB222", name: "Summit Insulated Bottle 650 ml" },
+    { id: "PROD-CCC333", name: "Gravel Tyre 700x40c" },
+    { id: "PROD-DDD444", name: "Summit Insulated Bottle 1 l" },
+  ];
+  it("resolves ids, names, slugs, shortened names and list numbers", () => {
+    expect(resolveCatalogRef(view, "prodaaa111")?.id).toBe("PROD-AAA111");
+    expect(resolveCatalogRef(view, "Gravel Tyre 700x40c")?.id).toBe("PROD-CCC333");
+    expect(resolveCatalogRef(view, "gravel-tyre-700x40c")?.id).toBe("PROD-CCC333");
+    expect(resolveCatalogRef(view, "trailhead-merino-socks")?.id).toBe("PROD-AAA111");
+    expect(resolveCatalogRef(view, "trailhead-merino-socks-2pk")?.id).toBe("PROD-AAA111");
+    expect(resolveCatalogRef(view, "summit-insulated-bottle-650")?.id).toBe("PROD-BBB222");
+    expect(resolveCatalogRef(view, "3")?.id).toBe("PROD-CCC333");
+  });
+  it("returns nothing for an ambiguous or unknown reference", () => {
+    expect(resolveCatalogRef(view, "summit-insulated-bottle")).toBeUndefined();
+    expect(resolveCatalogRef(view, "carbon-wheelset")).toBeUndefined();
+    expect(resolveCatalogRef(view, "9")).toBeUndefined();
+    expect(resolveCatalogRef(view, "")).toBeUndefined();
+  });
+});
+
+describe("usage of a multi-step call", () => {
+  const step = (input: number, output: number, cost?: number) => ({
+    usage: { inputTokens: input, outputTokens: output, totalTokens: input + output } as never,
+    providerMetadata: cost === undefined ? undefined : ({ openrouter: { usage: { cost } } } as never),
+  });
+  it("sums tokens and the reported cost over every step, not just the last one", () => {
+    const u = usageOfResult("anthropic/claude-haiku-5.5", { steps: [step(1000, 100, 0.001), step(2000, 50, 0.002), step(3000, 20, 0.0005)] });
+    expect(u.inputTokens).toBe(6000);
+    expect(u.outputTokens).toBe(170);
+    expect(u.costUsd).toBeCloseTo(0.0035, 8);
+    expect(u.reportedCostUsd).toBeCloseTo(0.0035, 8);
+  });
+  it("prices a step from the table when the provider reported no cost for it", () => {
+    const u = usageOfResult("anthropic/claude-haiku-5.5", { steps: [step(1000, 100, 0.001), step(1_000_000, 0)] });
+    expect(u.costUsd).toBeCloseTo(0.001 + 0.1, 6);
+    expect(u.reportedCostUsd).toBeUndefined();
+  });
+  it("falls back to the call totals when there are no steps", () => {
+    const u = usageOfResult("anthropic/claude-haiku-5.5", { totalUsage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 } as never });
+    expect(u.totalTokens).toBe(15);
+  });
 });

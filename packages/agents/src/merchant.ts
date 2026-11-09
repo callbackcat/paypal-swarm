@@ -1,7 +1,7 @@
 import { ALLOWLISTS, summariseCapture, type ToolOutcome } from "@swarm/paypal";
 import { generateText, stepCountIs, type ModelMessage } from "ai";
 import { z } from "zod";
-import { normaliseUsage, ZERO_USAGE } from "./llm";
+import { usageOfResult, ZERO_USAGE } from "./llm";
 import { unansweredToolCalls, windowHistory } from "./history";
 import { byName, fail, logged, ok, platformTool, toToolSet, type AgentTool } from "./tools";
 import type { MerchantInboxItem, OrderRecord, World } from "./world";
@@ -160,7 +160,17 @@ export function merchantTools(world: World): AgentTool[] {
       ),
     );
   }
-  for (const n of ["get_shipment_tracking", "update_shipment_tracking", "list_disputes", "get_dispute"] as const) if (pp[n]) tools.push(logged(world, pp[n]!, { actor: MERCHANT, actorClass: "merchant" }));
+  // Reading or updating a tracker answered 403 "Unknown error" on every one of 26 calls against the sandbox app, while
+  // create_shipment_tracking succeeded 151 times of 153. The call still goes to PayPal and keeps its status and PayPal's own
+  // words in the log; the model gets a message it can act on instead of retrying.
+  const TRACKING_403 = "PayPal refused this tracking call for this app (HTTP 403). Do not retry it. Rely on what create_shipment_tracking returned for the order; if no tracking was created yet, create it.";
+  for (const n of ["get_shipment_tracking", "update_shipment_tracking"] as const) {
+    const t = pp[n];
+    if (!t) continue;
+    const explained = { ...t, run: async (input: unknown) => { const o = await t.run(input); return !o.ok && o.status === 403 ? { ...o, message: `${TRACKING_403} PayPal said: ${o.message ?? "no message"}` } : o; } };
+    tools.push(logged(world, explained, { actor: MERCHANT, actorClass: "merchant" }));
+  }
+  for (const n of ["list_disputes", "get_dispute"] as const) if (pp[n]) tools.push(logged(world, pp[n]!, { actor: MERCHANT, actorClass: "merchant" }));
 
   // accept_dispute_claim: the toolkit validates `note` with the dispute-id regex, so we call the REST endpoint directly
   // but keep the toolkit's name and description so prompts and allow-lists stay honest.
@@ -288,7 +298,7 @@ export async function runMerchant(world: World): Promise<void> {
             abortSignal: world.o.control.abort.signal,
             experimental_telemetry: { isEnabled: true, functionId: "merchant", metadata: { runId: world.runId, profile: world.merchantProfile } },
           });
-          const usage = normaliseUsage(world.o.models.merchant, result.totalUsage, result.providerMetadata);
+          const usage = usageOfResult(world.o.models.merchant, result);
           guard.record(MERCHANT, usage);
           const unanswered = unansweredToolCalls(result.response.messages);
           await world.emit("agent.turn", MERCHANT, "merchant", { actor: MERCHANT, model: world.o.models.merchant, turn: turn++, steps: result.steps.length, finishReason: result.finishReason, text: result.text.slice(0, 400), toolCalls: result.toolCalls.map((c) => c.toolName), batch: batch.length, usage, costUsd: usage.costUsd, cached: (world.o.cache?.stats.hits ?? 0) > cacheHitsBefore, cutOff: unanswered.length > 0 ? unanswered.map((c) => c.toolName) : undefined, attempt });

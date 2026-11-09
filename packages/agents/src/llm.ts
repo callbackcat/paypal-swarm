@@ -70,6 +70,38 @@ export function normaliseUsage(model: string, u: LanguageModelUsage | undefined,
 
 export const ZERO_USAGE: Usage = { inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheWriteTokens: 0, totalTokens: 0, costUsd: 0 };
 
+/** What a finished generateText / streamText call exposes for accounting. */
+export interface UsageSource {
+  steps?: ReadonlyArray<{ usage?: LanguageModelUsage; providerMetadata?: ProviderMetadata }>;
+  totalUsage?: LanguageModelUsage;
+  providerMetadata?: ProviderMetadata;
+}
+
+/**
+ * Usage and cost of a whole call, summed step by step. `result.providerMetadata` describes the last step only, so
+ * reading OpenRouter's cost from it while taking tokens from `totalUsage` under-reports every turn that made a tool
+ * call (measured: 12 to 47 % of the real cost). Each step carries its own usage and its own reported cost.
+ */
+export function usageOfResult(model: string, result: UsageSource): Usage {
+  const steps = result.steps ?? [];
+  if (!steps.length) return normaliseUsage(model, result.totalUsage, result.providerMetadata);
+  let reportedAll = true;
+  const sum = { ...ZERO_USAGE };
+  let reported = 0;
+  for (const s of steps) {
+    const u = normaliseUsage(model, s.usage, s.providerMetadata);
+    sum.inputTokens += u.inputTokens;
+    sum.outputTokens += u.outputTokens;
+    sum.cachedTokens += u.cachedTokens;
+    sum.cacheWriteTokens += u.cacheWriteTokens;
+    sum.totalTokens += u.totalTokens;
+    sum.costUsd += u.costUsd;
+    if (u.reportedCostUsd === undefined) reportedAll = false;
+    else reported += u.reportedCostUsd;
+  }
+  return reportedAll ? { ...sum, reportedCostUsd: reported } : sum;
+}
+
 export interface LlmFactory {
   readonly mode: "live";
   model(id: string): LanguageModel;

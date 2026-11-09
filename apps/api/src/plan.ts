@@ -1,4 +1,4 @@
-import { DEFAULT_MODELS, makeLlm, normaliseUsage, PRICES, type Usage, ZERO_USAGE } from "@swarm/agents";
+import { DEFAULT_MODELS, makeLlm, PRICES, type Usage, usageOfResult, ZERO_USAGE } from "@swarm/agents";
 import { SCENARIOS, type RunConfig } from "@swarm/core";
 import { generateText, Output } from "ai";
 import { z } from "zod";
@@ -108,7 +108,7 @@ export async function planRun(input: PlanRequest, deps: { env: Env; apiKey?: str
       experimental_telemetry: { isEnabled: true, functionId: "plan-run" },
     });
     const plan = PlanSchema.parse(result.output);
-    return { plan, config: toConfig(plan), source: "llm", usage: normaliseUsage(model, result.totalUsage, result.providerMetadata), model };
+    return { plan, config: toConfig(plan), source: "llm", usage: usageOfResult(model, result), model };
   } catch (e) {
     console.warn("[swarm-api] plan-run fell back to keywords:", (e as Error).message);
     const plan = heuristicPlan(input.text);
