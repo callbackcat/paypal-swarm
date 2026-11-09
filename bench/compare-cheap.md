@@ -12,5 +12,9 @@
 | gpt-oss-120b | quiet-tuesday | hardened | 100 | 4 / 4 | 28k | $0.0008 | 80 s | none | WEBHOOK_GAP(info) |
 | gpt-6-luna | quiet-tuesday | baseline | 90 | 5 / 0 | 24k | $0.0008 | 76 s | none | CAPTURE_WITHOUT_TRACKING(high) x5, WEBHOOK_GAP(info) |
 | gpt-6-luna | quiet-tuesday | hardened | 100 | 5 / 5 | 14k | $0.0006 | 72 s | none | WEBHOOK_GAP(info) |
+| gpt-oss-120b | lost-parcels | baseline | 90 | 9 / 4 | 131k | $0.0021 | 89 s | none | CAPTURE_WITHOUT_TRACKING(high) x5, WEBHOOK_GAP(info) |
+| gpt-oss-120b | lost-parcels | hardened | 93 | 8 / 8 | 113k | $0.0018 | 88 s | pay_order:503 x1 | BUYER_LEFT_WAITING(high), BUYER_LEFT_WAITING(medium), DUPLICATE_CAPTURE_ATTEMPT(low), WEBHOOK_GAP(info) |
+| gpt-6-luna | lost-parcels | baseline | 90 | 7 / 0 | 46k | $0.0015 | 88 s | get_shipment_tracking:403 x7 | CAPTURE_WITHOUT_TRACKING(high) x7, WEBHOOK_GAP(info) |
+| gpt-6-luna | lost-parcels | hardened | 100 | 7 / 7 | 21k | $0.0009 | 84 s | none | WEBHOOK_GAP(info) |
 
-12 rows for compare-cheap
+16 rows for compare-cheap

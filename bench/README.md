@@ -8,12 +8,11 @@ node bench.mjs "$(node compare-configs.mjs top)" compare-top       # claude-sonn
 node summarise.cjs compare-cheap md                                 # markdown table for a label
 ```
 
-Labels so far: `haiku`, `haiku-v2`, `haiku-v3` (all agents on claude-haiku-5.5; v3 is after the merchant history repair), `compare-cheap` (12 of 16 cells; see below).
+Labels: `haiku-sandbox`, `haiku-v2`, `haiku-v3` (all agents on claude-haiku-5.5; v3 is after the merchant history repair), `compare-cheap`, `compare-top`.
 
-## Status, 8 Nov 2026 evening
+## Status, 9 Nov 2026
 
-- `compare-cheap.md` has the 12 finished cells: gemini-2.5-flash-lite and deepseek-v4.1-flash on both scenarios, gpt-oss-120b and gpt-6-luna on quiet-tuesday only.
-- The last four cells (gpt-oss-120b and gpt-6-luna on lost-parcels) were refused with HTTP 429: the api's own demo-key fence (`DEMO_DAILY_TOKEN_CAP`, 1.5M estimated tokens per IP per day, in memory) was exhausted after 12 live runs because it charges the conservative pre-run estimate, not the measured spend.
-- To continue: either raise `DEMO_DAILY_TOKEN_CAP` in `.env` and restart the api, or let `bench.mjs` send `openrouterApiKey` read from `.env` so the runs count as bring-your-own and are not fenced. Then re-run the four missing cells with
-  `node bench.mjs "$(node compare-configs.mjs cheap lost-parcels)" compare-cheap` (this re-runs gemini and deepseek too; trim the JSON if that matters), then the `top` set.
-- Every cheap model reproduced the Haiku pattern: hardened removes all tracking and waiting findings (98–100), baselines sit at 82–91. The scorer is measuring the merchant, not the model; cost per run is $0.0006–0.011.
+- All 28 comparison cells are in `results.jsonl`: labels `compare-cheap` (16 cells) and `compare-top` (12 cells). `node comparison.cjs` prints the README table; `model-comparison.md` is the README section as written.
+- The 28 runs cost $0.95 in total. Scores: baselines 82–91, hardened 93–100 on every model.
+- On 8 Nov the last four cheap cells were refused with HTTP 429 by the api's own demo-key fence (`DEMO_DAILY_TOKEN_CAP`, 1.5M tokens per IP per day, in memory): it compares the conservative pre-run estimate against the allowance. The 9 Nov runs started the api with `DEMO_DAILY_TOKEN_CAP=50000000` in the process environment; `.env` was not changed.
+- `missing-cheap.json` is the config used for those four cells.
