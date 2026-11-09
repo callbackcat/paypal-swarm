@@ -244,7 +244,7 @@ describe("catalog reference resolver", () => {
 
 describe("reasoning-off wrapper", () => {
   const fake = (name: string, fail?: string) => {
-    const m = { calls: 0, modelId: name, async doGenerate() { m.calls++; if (fail) throw new Error(fail); return { from: name }; }, async doStream() { m.calls++; if (fail) throw new Error(fail); return { from: name }; } };
+    const m = { calls: 0, modelId: name, async doGenerate(_options?: unknown) { m.calls++; if (fail) throw new Error(fail); return { from: name }; }, async doStream(_options?: unknown) { m.calls++; if (fail) throw new Error(fail); return { from: name }; } };
     return m;
   };
   it("falls back to the plain model once an endpoint says reasoning is mandatory, and stays there", async () => {
