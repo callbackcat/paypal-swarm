@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { BudgetGuard, estimateRun } from "./budget";
 import { cacheKey, cacheMiddleware, MemoryCacheStore } from "./cache";
 import { loadCatalog, startRun, type RunDeps } from "./executor";
-import { costFor, usageOfResult, ZERO_USAGE } from "./llm";
+import { costFor, usageOfResult, withoutReasoning, ZERO_USAGE } from "./llm";
 import { repairToolHistory, unansweredToolCalls, windowHistory } from "./history";
 import { resolveCatalogRef } from "./shopper";
 import { MemoryApprovalGate, MemoryEventSink } from "./world";
@@ -239,6 +239,29 @@ describe("catalog reference resolver", () => {
     expect(resolveCatalogRef(view, "carbon-wheelset")).toBeUndefined();
     expect(resolveCatalogRef(view, "9")).toBeUndefined();
     expect(resolveCatalogRef(view, "")).toBeUndefined();
+  });
+});
+
+describe("reasoning-off wrapper", () => {
+  const fake = (name: string, fail?: string) => {
+    const m = { calls: 0, modelId: name, async doGenerate() { m.calls++; if (fail) throw new Error(fail); return { from: name }; }, async doStream() { m.calls++; if (fail) throw new Error(fail); return { from: name }; } };
+    return m;
+  };
+  it("falls back to the plain model once an endpoint says reasoning is mandatory, and stays there", async () => {
+    const quiet = fake("quiet", "Reasoning is mandatory for this endpoint and cannot be disabled.");
+    const plain = fake("plain");
+    const model = withoutReasoning(quiet, plain);
+    expect(await model.doGenerate({} as never)).toEqual({ from: "plain" });
+    expect(await model.doStream({} as never)).toEqual({ from: "plain" });
+    expect(quiet.calls).toBe(1);
+    expect(plain.calls).toBe(2);
+    expect(model.modelId).toBe("quiet");
+  });
+  it("uses the quiet model when it works and passes other errors through", async () => {
+    const ok = withoutReasoning(fake("quiet"), fake("plain"));
+    expect(await ok.doGenerate({} as never)).toEqual({ from: "quiet" });
+    const broken = withoutReasoning(fake("quiet", "rate limited"), fake("plain"));
+    await expect(broken.doGenerate({} as never)).rejects.toThrow("rate limited");
   });
 });
 

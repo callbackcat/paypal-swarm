@@ -111,6 +111,42 @@ export interface LlmFactory {
  * OpenRouter is the only provider seam. Any OpenRouter model id works; Anthropic models get automatic
  * prompt caching through the top-level cache_control, and `usage.include` returns the exact USD cost.
  */
+const REASONING_MANDATORY = /reasoning is mandatory/i;
+const saysReasoningMandatory = (e: unknown): boolean => {
+  const err = e as { message?: string; responseBody?: string; cause?: unknown } | undefined;
+  return !!err && (REASONING_MANDATORY.test(err.message ?? "") || REASONING_MANDATORY.test(err.responseBody ?? "") || saysReasoningMandatory(err.cause));
+};
+
+/**
+ * Agent turns run under small output caps (400 tokens for a shopper). Models that reason by default (Claude 5.5 through
+ * OpenRouter) spent 320–400 of those on hidden thinking and the tool call never came, so reasoning is requested off.
+ * Some endpoints refuse that ("Reasoning is mandatory", for example Sonnet 5.5); the first refusal switches that model to
+ * the plain settings for the rest of the process, so it costs one failed call per model, not one per turn.
+ */
+type CallableModel = { doGenerate: (options: never) => PromiseLike<unknown>; doStream: (options: never) => PromiseLike<unknown> };
+export function withoutReasoning<M extends CallableModel>(quiet: M, plain: M): M {
+  let mandatory = false;
+  const attempt = async <T>(run: (m: M) => PromiseLike<T>): Promise<T> => {
+    if (!mandatory) {
+      try {
+        return await run(quiet);
+      } catch (e) {
+        if (!saysReasoningMandatory(e)) throw e;
+        mandatory = true;
+      }
+    }
+    return run(plain);
+  };
+  const proxy: ProxyHandler<M> = {
+    get(target, key, receiver) {
+      if (key === "doGenerate") return (options: Parameters<M["doGenerate"]>[0]) => attempt((m) => m.doGenerate(options));
+      if (key === "doStream") return (options: Parameters<M["doStream"]>[0]) => attempt((m) => m.doStream(options));
+      return Reflect.get(target, key, receiver);
+    },
+  };
+  return new Proxy(quiet, proxy);
+}
+
 export function makeLlm(opts: { apiKey: string; cache?: CacheStore; appName?: string }): LlmFactory {
   const provider = createOpenRouter({
     apiKey: opts.apiKey,
@@ -122,7 +158,8 @@ export function makeLlm(opts: { apiKey: string; cache?: CacheStore; appName?: st
     model(id: string) {
       let m = models.get(id);
       if (!m) {
-        const base = provider.chat(id, { usage: { include: true }, cache_control: { type: "ephemeral" } } as Parameters<typeof provider.chat>[1]);
+        const settings = { usage: { include: true }, cache_control: { type: "ephemeral" } } as Parameters<typeof provider.chat>[1];
+        const base = withoutReasoning(provider.chat(id, { ...settings, reasoning: { enabled: false } } as typeof settings), provider.chat(id, settings));
         m = opts.cache ? wrapLanguageModel({ model: base, middleware: cacheMiddleware(opts.cache, id) }) : base;
         models.set(id, m);
       }
