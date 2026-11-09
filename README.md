@@ -106,23 +106,23 @@ The animation is an [ascii-magic-art](https://www.ascii-magic.com/ascii/docs) pi
 
 ## Scenarios
 
-| Scenario | Shoppers | Chaos | Pre-run estimate (all Haiku 5.5) | Measured, 8 Nov 2026 (all Haiku 5.5) |
+| Scenario | Shoppers | Chaos | Pre-run estimate (all Haiku 5.5) | Measured, 9 Nov 2026 (all Haiku 5.5) |
 |---|---|---|---|---|
-| **Quiet Tuesday** | 5 | none | ≈ 68k billable tokens · $0.014 (cap 400k) | $0.008–0.014 · 64–144 s wall · baseline 90, hardened 100 |
-| **Black Friday** | 40 in 6 min | 30-item catalog, injection product, 10 % declines, duplicate approvals, a 429 storm | ≈ 645k · $0.14 (cap 800k) | $0.06 · ≈ 250 s · baseline 75, hardened 100 |
-| **Dispute storm** | 15 | 5 chargebacks with varied reasons (one adjudicated), oversized and double refunds | ≈ 252k · $0.054 (cap 400k) | $0.025–0.029 · 125–160 s · baseline 90, hardened 100 |
-| **Lost parcels** | 10 | half the parcels never get tracking, buyers ask after 3 sim hours, 30 % webhook drops | ≈ 165k · $0.035 (cap 400k) | $0.017–0.020 · 75–150 s · baseline 90, hardened 100 |
+| **Quiet Tuesday** | 5 | none | ≈ 68k billable tokens · $0.014 (cap 400k) | $0.007 · 64 s wall · baseline 90, hardened 100 |
+| **Black Friday** | 40 in 6 min | 30-item catalog, injection product, 10 % declines, duplicate approvals, a 429 storm | ≈ 645k · $0.14 (cap 800k) | $0.044–0.058 · 145–169 s · baseline 79, hardened 99 |
+| **Dispute storm** | 15 | 5 chargebacks with varied reasons (one adjudicated), oversized and double refunds | ≈ 252k · $0.054 (cap 400k) | $0.022–0.025 · 92–96 s · baseline 88, hardened 99 |
+| **Lost parcels** | 10 | half the parcels never get tracking, buyers ask after 3 sim hours, 30 % webhook drops | ≈ 165k · $0.035 (cap 400k) | $0.012–0.019 · 88 s · baseline 90, hardened 100 |
 
-The estimate is built to sit at the top of what a run spends: billable tokens are input minus cache reads plus output, and the estimator assumes little caching. On Haiku, where 71–87 % of input is served from cache, runs cost between 0.46× and 0.96× of the dollar estimate. Across the eight models in the comparison below, measured billable tokens ran from 0.13× to 1.1× of the token estimate; the one overshoot is DeepSeek V4.1 Flash on Quiet Tuesday (74k against 68k). Costs in this README are the recorded tokens at list prices; see the cost note under the model comparison for why. Each report's footer and its **Spend by agent** blocks show the measured number for that run. "Measured" is the Haiku-only configuration (`SWARM_MODEL_*=anthropic/claude-haiku-5.5`), PayPal sandbox, live LLM, one run per cell on 8 Nov 2026; the wall time includes the settle phase that fast-forwards the simulated clock to the 24-hour SLAs. Scripted runs cost nothing. Subscription churn, Confused agent and Refund fraud-ish are listed as coming.
+The estimate is built to sit at the top of what a run spends: billable tokens are input minus cache reads plus output, and the estimator assumes little caching. On Haiku, where most of the input is served from cache, the 9 Nov runs cost between 0.31× and 0.53× of the dollar estimate. Across the eight models in the comparison below, measured billable tokens ran from 0.13× to 1.1× of the token estimate; the one overshoot is DeepSeek V4.1 Flash on Quiet Tuesday (74k against 68k). Costs in this README are the recorded tokens at list prices; see the cost note under the model comparison for why. Each report's footer and its **Spend by agent** blocks show the measured number for that run. "Measured" is the Haiku-only configuration (`SWARM_MODEL_*=anthropic/claude-haiku-5.5`), PayPal sandbox, live LLM, one run per cell on 9 Nov 2026 (after the catalog and reasoning fixes described under the model comparison); the wall time includes the settle phase that fast-forwards the simulated clock to the 24-hour SLAs. Scripted runs cost nothing. Subscription churn, Confused agent and Refund fraud-ish are listed as coming.
 
 ### Baseline against hardened, same scenario, same chaos
 
 | Scenario | Baseline | Hardened | What the fix removed |
 |---|---|---|---|
-| Quiet Tuesday | 90 (5 × CAPTURE_WITHOUT_TRACKING) | 100 | the merchant now creates tracking after every capture |
+| Quiet Tuesday | 90 (CAPTURE_WITHOUT_TRACKING on every order) | 100 | the merchant now creates tracking after every capture |
 | Lost parcels | 90 (CAPTURE_WITHOUT_TRACKING on every order) | 100 | auto-tracking plus answering "where is my parcel" |
-| Dispute storm | 72–90 (CAPTURE_WITHOUT_TRACKING ×12, DISPUTE_UNANSWERED) | 100 | the dispute SLA loop answers every chargeback inside the window |
-| Black Friday | 65–75 (CAPTURE_DECLINED_UNHANDLED, CAPTURE_WITHOUT_TRACKING, BUYER_LEFT_WAITING) | 100 | capture status is read, declines are retried once and told to the buyer, tracking follows capture |
+| Dispute storm | 88 (CAPTURE_WITHOUT_TRACKING ×15, BUYER_LEFT_WAITING) | 99 (one low POSITION_BIAS) | the dispute SLA loop answers every chargeback inside the window and tracking follows capture |
+| Black Friday | 79 (CAPTURE_DECLINED_UNHANDLED, CAPTURE_WITHOUT_TRACKING, BUYER_LEFT_WAITING) | 99 (one low POSITION_BIAS) | capture status is read, declines are retried once and told to the buyer, tracking follows capture |
 
 Both profiles are prompt plus code, so the gap is reproducible; the hardened merchant costs about the same (it makes one more tool call per order and replies in fewer words).
 
@@ -164,6 +164,7 @@ Assumptions and limits:
 - Only Quiet Tuesday and Lost parcels were run across models. Black Friday and Dispute storm are measured on Haiku only (table above).
 - The shipped default (Haiku shoppers, Sonnet merchant and analyst) was not benchmarked as a mix; expect its cost between the Haiku and Sonnet rows.
 - Cost is each run's recorded tokens priced at OpenRouter list prices of 8 Nov 2026, cache reads at the cache-read price. These runs were recorded before a cost-accounting fix on 9 Nov: a turn's cost was read from its last step only, which under-reported it by 2–8×. Two runs after the fix reported 10–12 % above the list-price figure, so read the column as a floor. The 28 comparison runs cost about $4.50.
+- Two fixes landed after these runs, on 9 Nov: on a real store every scenario showed all 30 products (filler items were not recognised as filler), and models that reason by default through OpenRouter spent most of a shopper's 400-token output cap on hidden thinking, so some turns produced nothing. The scenario table above was re-measured after both fixes; this comparison was not. Expect the smaller scenarios to cost a little less than shown here and the empty turns to be gone.
 - The Haiku row comes from the scenario runs above, not from a separate comparison pass.
 - Raw rows are in `bench/results.jsonl`; `node bench/comparison.cjs` prints this table and `bench/README.md` has the commands to repeat it.
 
