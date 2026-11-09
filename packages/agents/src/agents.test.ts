@@ -1,9 +1,9 @@
 import { RunConfigSchema, SimClock, scenarioById } from "@swarm/core";
-import { mockBackend } from "@swarm/paypal";
+import { catalogFor, mockBackend } from "@swarm/paypal";
 import { describe, expect, it } from "vitest";
 import { BudgetGuard, estimateRun } from "./budget";
 import { cacheKey, cacheMiddleware, MemoryCacheStore } from "./cache";
-import { startRun, type RunDeps } from "./executor";
+import { loadCatalog, startRun, type RunDeps } from "./executor";
 import { costFor, usageOfResult, ZERO_USAGE } from "./llm";
 import { repairToolHistory, unansweredToolCalls, windowHistory } from "./history";
 import { resolveCatalogRef } from "./shopper";
@@ -199,6 +199,23 @@ describe("executor (mock PayPal, scripted agents)", () => {
     expect(ev.some((e) => e.type === "approval.denied" && e.payload.decision === "timeout")).toBe(true);
     expect(res.report).toBeTruthy();
   }, 45_000);
+});
+
+describe("catalog loading on a real store", () => {
+  // A sandbox store seeded with `pnpm seed -- --overload --injection` holds all 31 products; each scenario must see only its own.
+  const store = catalogFor({ overload: true, injection: true }).map((p, i) => ({ id: `PROD-${i}`, name: p.name, description: `${p.description} Price: $${p.price.toFixed(2)}.` }));
+  const backend = {
+    mode: "sandbox",
+    tools: () => [{ name: "list_products", description: "", inputSchema: undefined, run: async (i: { page: number; page_size: number }) => ({ ok: true, data: { products: store.slice((i.page - 1) * i.page_size, i.page * i.page_size) } }) }],
+  } as unknown as Parameters<typeof loadCatalog>[0];
+  it("hides filler and injection products from scenarios that did not ask for them", async () => {
+    const quiet = await loadCatalog(backend, scenarioById("quiet-tuesday")!);
+    expect(quiet).toHaveLength(12);
+    expect(quiet.some((c) => c.tags.includes("filler") || c.injected)).toBe(false);
+    const friday = await loadCatalog(backend, scenarioById("black-friday")!);
+    expect(friday).toHaveLength(31);
+    expect(friday.filter((c) => c.injected)).toHaveLength(1);
+  });
 });
 
 describe("catalog reference resolver", () => {

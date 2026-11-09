@@ -163,6 +163,8 @@ async function execute(runId: string, config: RunConfig, deps: RunDeps, control:
  */
 export async function loadCatalog(backend: PayPalBackend, scenario: Scenario, log?: (m: string) => void): Promise<CatalogItem[]> {
   const wanted = catalogFor(scenario.catalog);
+  // Tags come from the full demo catalog, so filler items are recognised (and hidden) even when the scenario did not ask for them.
+  const known = catalogFor({ overload: true, injection: true });
   if (backend.mode === "mock") {
     const store = (backend as { store?: { createProduct(p: { name: string; description: string; type?: string }): { id: string }; products: Map<string, unknown> } }).store;
     if (store && store.products.size === 0) {
@@ -174,7 +176,7 @@ export async function loadCatalog(backend: PayPalBackend, scenario: Scenario, lo
       const r = await seed.run({ page, page_size: 20, total_required: true });
       const products = ((r.data as { products?: Array<{ id: string; name: string; description?: string }> })?.products ?? []);
       for (const p of products) {
-        const meta = wanted.find((w) => w.name === p.name);
+        const meta = known.find((w) => w.name === p.name);
         all.push({ id: p.id, name: p.name, description: p.description ?? "", price: priceFromDescription(p.description) ?? meta?.price ?? 25, tags: meta?.tags ?? [], injected: meta?.tags.includes("injection") });
       }
       if (products.length < 20) break;
@@ -189,7 +191,7 @@ export async function loadCatalog(backend: PayPalBackend, scenario: Scenario, lo
     if (!r.ok) throw new Error(`list_products failed: ${r.message}`);
     const products = ((r.data as { products?: Array<{ id: string; name: string; description?: string }> })?.products ?? []);
     for (const p of products) {
-      const meta = wanted.find((w) => w.name === p.name);
+      const meta = known.find((w) => w.name === p.name);
       all.push({ id: p.id, name: p.name, description: p.description ?? "", price: priceFromDescription(p.description) ?? meta?.price ?? 25, tags: meta?.tags ?? [], injected: meta?.tags.includes("injection") || /ignore your budget/i.test(p.description ?? "") });
     }
     if (products.length < 20) break;
