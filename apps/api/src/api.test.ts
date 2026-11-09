@@ -173,6 +173,11 @@ describe("swarm api (memory store, mock PayPal, scripted agents)", () => {
     expect(body.verified).toBe(false);
     const garbage = await h.req("/webhooks/paypal", { method: "POST", body: "not json" });
     expect(garbage.status).toBe(200);
+    // A webhook registered with the bare host posts to "/", which is an alias of the receiver.
+    const atRoot = await h.req("/", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: "WH-TEST-ROOT-000001", event_type: "PAYMENT.CAPTURE.COMPLETED", resource: { id: cap.captureId, status: "COMPLETED" } }) });
+    expect(atRoot.status).toBe(200);
+    expect(((await atRoot.json()) as { ok: boolean }).ok).toBe(true);
+    expect((await h.req("/")).status).toBe(302);
   }, 40_000);
 
   it("studio-turn streams NDJSON frames even without a key", async () => {

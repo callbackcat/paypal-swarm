@@ -252,7 +252,7 @@ pnpm dev
 
 Shipment tracking: the toolkit posts to `/v1/shipping/trackers-batch`, which answers `NOT_AUTHORIZED` unless the REST app has the Tracking permission. Swarm then falls back to `POST /v2/checkout/orders/{id}/track` (plain checkout scopes) and logs the tool result with `via: orders-v2-track`, so the merchant still ships.
 
-Register `https://<api host>/webhooks/paypal` under Sandbox Webhooks in the developer dashboard and put the id in `PAYPAL_WEBHOOK_ID`. `/healthz` then reports `paypal: sandbox`, `llm: live`, `webhooks: true`.
+Register `https://<api host>/webhooks/paypal` under Sandbox Webhooks in the developer dashboard and put the id in `PAYPAL_WEBHOOK_ID`. The bare `https://<api host>` works too: `POST /` is an alias of the receiver. `/healthz` then reports `paypal: sandbox`, `llm: live`, `webhooks: true`.
 
 ## Deploy
 

@@ -167,7 +167,8 @@ export function createApp(deps: AppDeps) {
 
   // --- webhooks ---------------------------------------------------------------------------------
   app.openAPIRegistry.registerPath({ method: "post", path: "/webhooks/paypal", tags: ["webhooks"], summary: "PayPal webhook receiver", description: "Register this URL in the PayPal developer dashboard (Sandbox → Webhooks). Signature is verified with PAYPAL_WEBHOOK_ID when set; unverified deliveries are stored but flagged.", responses: { 200: { description: "Always 200 so PayPal does not retry forever" } } });
-  app.post("/webhooks/paypal", async (c) => {
+  // POST / is an alias: a webhook registered in PayPal with the bare host still reaches the receiver.
+  app.on("POST", ["/webhooks/paypal", "/"], async (c) => {
     const raw = await c.req.text();
     let body: Record<string, unknown>;
     try {
