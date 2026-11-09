@@ -93,9 +93,10 @@ export default function ArenaPage() {
     return c;
   }, [state.feed]);
 
-  const orders = useMemo(() => [...state.orders.values()].sort((a, b) => b.lastEventId - a.lastEventId), [state.orders]);
-  const pending = useMemo(() => [...state.approvals.values()].filter((a) => a.status === "pending"), [state.approvals]);
-  const decided = useMemo(() => [...state.approvals.values()].filter((a) => a.status !== "pending"), [state.approvals]);
+  // The maps are mutated in place by applyEvent, so the event count, not the map, is what changes between renders.
+  const orders = useMemo(() => [...state.orders.values()].sort((a, b) => b.lastEventId - a.lastEventId), [state.orders, state.total]);
+  const pending = useMemo(() => [...state.approvals.values()].filter((a) => a.status === "pending"), [state.approvals, state.total]);
+  const decided = useMemo(() => [...state.approvals.values()].filter((a) => a.status !== "pending"), [state.approvals, state.total]);
   const finished = done || (run ? isTerminal(run.status) : false);
   const cap = run?.tokenCap ?? Number(state.started?.tokenCap ?? 0);
   const tokens = run?.budget?.total ?? state.budget.tokensIn + state.budget.tokensOut;

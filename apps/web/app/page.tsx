@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtTokens, fmtUsd, type Estimate, type Modes, type PlanResult, type RunConfigInput, type RunListItem, type ScenariosResponse } from "@/lib/api";
 import { ErrorAlert, ModeTags, RunStatus, ScenarioListSkeleton, ValueSkeleton } from "@/components/ui";
 import { SwarmLauncher } from "@/components/SwarmLauncher";
+import { Closing, Engine, Measured, Paths, Questions, StackStrip } from "@/components/Landing";
 import { ArrowUpRight, Icon, Information } from "@/components/sodium/icon";
 import { Button } from "@/components/sodium/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
@@ -16,7 +17,7 @@ import { RadioGroup, RadioGroupOption } from "@/components/sodium/ui/radio-group
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/sodium/ui/select";
 import { Status } from "@/components/sodium/ui/status";
 import { Switch } from "@/components/sodium/ui/switch";
-import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableLoading, TableRow } from "@/components/sodium/ui/table";
+import { Tag } from "@/components/sodium/ui/tag";
 
 const PROFILES: Array<{ id: "baseline" | "hardened"; label: string; blurb: string }> = [
   { id: "baseline", label: "Baseline merchant", blurb: "Captures on every approval, treats HTTP 200 as paid, ships only when asked and ignores disputes until prompted. The way most first agents are wired." },
@@ -170,10 +171,10 @@ export default function SetupPage() {
 
   return (
     <>
-      <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-6 lg:py-10">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <h1 className="type-title">Release a swarm at your checkout</h1>
-          <p className="max-w-measure type-body text-text-2">LLM shoppers and a chaos agent hit your PayPal sandbox store. You get a readiness score and the fix behind every finding.</p>
+      <section id="launch" className="mx-auto flex w-full max-w-3xl scroll-mt-6 flex-col gap-8 py-10 lg:py-16">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <h1 className="type-display text-text-1">Stress-test your checkout with a swarm of AI shoppers</h1>
+          <p className="max-w-measure type-body text-text-2">Describe the crowd in a sentence. LLM shoppers, a merchant agent and a chaos agent hit your PayPal sandbox store, and you get a readiness score with the fix behind every finding.</p>
           <Button variant="ghost" size="sm" onClick={() => setAbout(true)}>
             <Icon icon={Information} />
             How it works
@@ -182,6 +183,11 @@ export default function SetupPage() {
         <ErrorAlert error={error} />
         <SwarmLauncher scenarios={data?.scenarios ?? null} onPlan={applyPlan} onRelease={(both) => void start(both)} onSettings={() => setSettings(true)} estimateLine={estimateLine} starting={starting} blocker={blocker} />
       </section>
+
+      <StackStrip />
+      <Paths onSettings={() => setSettings(true)} />
+      <Engine />
+      <Measured />
 
       <Dialog open={about} onOpenChange={setAbout}>
         <DialogContent size="lg">
@@ -458,52 +464,66 @@ export default function SetupPage() {
         </DialogContent>
       </Dialog>
 
-      <section className="mx-auto w-full max-w-3xl">
-    <Table
-      size="sm"
-      title="Recent runs"
-      count={runs?.length}
-      aria-busy={runs === null}
-      actions={
-        <Button variant="ghost" size="icon-sm" aria-label="All runs" render={<Link href="/runs" />} nativeButton={false}>
-          <Icon icon={ArrowUpRight} />
-        </Button>
-      }
-    >
-      <TableHeader>
-        <TableRow>
-          <TableHead>Run</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead numeric>Score</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+      <section className="flex w-full flex-col gap-10 border-t border-line py-14 lg:py-20" aria-labelledby="recent-runs">
+        <div className="mx-auto flex max-w-measure flex-col items-center gap-3 text-center">
+          <h2 id="recent-runs" className="type-heading text-text-1">If you would rather read first, open a finished run.</h2>
+          <p className="type-body text-text-2">The latest runs on this api, with their scores. Each opens on its Arena; the report and the Studio are one click further.</p>
+        </div>
         {runs === null ? (
-          <TableLoading rows={4} columns={3} />
+          <ul className="grid gap-px border border-line bg-line sm:grid-cols-3" aria-busy>
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="flex flex-col gap-3 bg-page p-inset">
+                <ValueSkeleton width="w-40" />
+                <ValueSkeleton type="code-sm" width="w-24" />
+                <ValueSkeleton width="w-12" />
+              </li>
+            ))}
+          </ul>
         ) : runs.length ? (
-          runs.map((r) => (
-            <TableRow key={r.id}>
-              <TableCell className="whitespace-normal wrap-anywhere">
-                <Link href={`/runs/${r.id}`} className="hover:underline">
-                  {r.name}
-                </Link>
-              </TableCell>
-              <TableCell>
-                <RunStatus status={r.status} />
-              </TableCell>
-              <TableCell numeric>{r.score?.score ? String(r.score.score.overall) : "None"}</TableCell>
-            </TableRow>
-          ))
+          <ul className="grid gap-px border border-line bg-line sm:grid-cols-3">
+            {runs.slice(0, 3).map((r) => (
+              <li key={r.id} className="flex flex-col gap-4 bg-page p-inset">
+                <div className="flex flex-col gap-2">
+                  <Link href={`/runs/${r.id}`} className="type-body text-text-1 wrap-anywhere hover:underline">
+                    {r.name}
+                  </Link>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <RunStatus status={r.status} />
+                    <Tag size="sm" variant="outline">
+                      {r.merchantProfile} merchant
+                    </Tag>
+                  </span>
+                </div>
+                <div className="flex items-end justify-between gap-3">
+                  <span className="flex flex-col">
+                    <span className="type-label-sm text-text-2">Readiness</span>
+                    <span className="type-figure text-text-1">{r.score?.score ? String(r.score.score.overall) : "–"}</span>
+                  </span>
+                  <span className="flex gap-2">
+                    <Button variant="secondary" size="sm" render={<Link href={`/runs/${r.id}/report`} />} nativeButton={false}>
+                      Report
+                    </Button>
+                    <Button variant="ghost" size="icon-sm" aria-label="Open the Arena" render={<Link href={`/runs/${r.id}`} />} nativeButton={false}>
+                      <Icon icon={ArrowUpRight} />
+                    </Button>
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : (
-          runsFailed ? (
-          <TableEmpty colSpan={3} reason="error" title="Runs could not be loaded" description="The api did not answer." />
-        ) : (
-          <TableEmpty colSpan={3} title="No runs yet" description="The first run you release shows up here." />
-        )
+          <p className="text-center type-body-sm text-text-2">{runsFailed ? "Runs could not be loaded: the api did not answer." : "No runs yet. The first run you release shows up here."}</p>
         )}
-      </TableBody>
-    </Table>
+        <div className="flex justify-center">
+          <Button variant="ghost" size="sm" render={<Link href="/runs" />} nativeButton={false}>
+            All runs
+            <Icon icon={ArrowUpRight} />
+          </Button>
+        </div>
       </section>
+
+      <Questions />
+      <Closing onSettings={() => setSettings(true)} />
     </>
   );
 }
