@@ -17,7 +17,8 @@
   <a href="#readiness-rules">Rules</a> ·
   <a href="#token-budget-guard">Budget guard</a> ·
   <a href="#api">API</a> ·
-  <a href="#deploy">Deploy</a>
+  <a href="#deploy">Deploy</a> ·
+  <a href="https://swarm-api-ppdd.onrender.com/docs">Live API</a>
 </p>
 
 <p align="center">
@@ -256,12 +257,14 @@ Register `https://<api host>/webhooks/paypal` under Sandbox Webhooks in the deve
 
 ## Deploy
 
-`render.yaml` is a Render blueprint for `swarm-api`, `swarm-web` and a Postgres instance. Blueprints → New → this repo, then fill the `sync: false` secrets or leave them empty for mock mode. The web build inlines the api host.
+`render.yaml` is a Render blueprint for `swarm-api` and a Postgres instance. Blueprints → New → this repo, then fill the `sync: false` secrets or leave them empty for mock mode. The web app deploys to Vercel: project root `apps/web`, with `NEXT_PUBLIC_API_URL` set to the api URL (the build inlines it).
+
+The api runs at https://swarm-api-ppdd.onrender.com ([`/docs`](https://swarm-api-ppdd.onrender.com/docs), [`/healthz`](https://swarm-api-ppdd.onrender.com/healthz)) against the PayPal sandbox. It is on Render's free plan, which sleeps after 15 minutes without traffic, so the first request after a pause can take a minute or so.
 
 ## Tests and scripts
 
 ```bash
-pnpm test            # vitest, all offline: paypal 13 · core 14 · agents 9 · api 7
+pnpm test            # vitest, all offline: paypal 13 · core 14 · agents 16 · api 8
 pnpm typecheck
 pnpm smoke -- --fast # one real run through the RunManager in whatever modes .env allows
 pnpm art             # re-render assets/swarm.svg from assets/swarm-piece.js

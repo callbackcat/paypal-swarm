@@ -11,3 +11,4 @@ coverage/
 .DS_Store
 Thumbs.db
 scripts/.spike-last.json
+*.tsbuildinfo
