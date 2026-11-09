@@ -1,5 +1,6 @@
 // node comparison.cjs  -> the README "Model comparison" table: one row per model, both scenarios, both profiles.
 const fs = require("fs");
+const { cost } = require("./cost.cjs");
 const rows = fs.readFileSync(__dirname + "/results.jsonl", "utf8").trim().split("\n").map((l) => JSON.parse(l));
 // USD per million tokens, input / output, mirrored from packages/agents/src/llm.ts (OpenRouter list prices).
 const PRICE = {
@@ -25,7 +26,7 @@ for (const m of ORDER) {
   const have = cells.filter(Boolean);
   if (!have.length) continue;
   const sc = (r) => (r ? String(r.score) : "n/a");
-  const costs = have.map((r) => Number(r.costUsd || 0));
+  const costs = have.map((r) => cost(r));
   const walls = have.map((r) => Math.round(r.wallSec || 0));
   if (m !== HAIKU) total += costs.reduce((a, b) => a + b, 0);
   const errs = {};

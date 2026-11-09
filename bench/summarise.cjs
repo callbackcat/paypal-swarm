@@ -1,5 +1,6 @@
 // node summarise.cjs <label> [md]  -> one line per run, or a markdown table with md
 const fs = require("fs");
+const { cost } = require("./cost.cjs");
 const label = process.argv[2] || "compare-cheap";
 const md = process.argv[3] === "md";
 const rows = fs.readFileSync("results.jsonl", "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((r) => r.label === label);
@@ -16,7 +17,7 @@ if (md) {
 }
 for (const r of rows) {
   const tok = (r.tokensIn || 0) - (r.tokensCached || 0) + (r.tokensOut || 0);
-  const cells = [short(r.models && r.models.shopper), r.scenario, r.profile, String(r.score), r.captured + " / " + r.shipped, Math.round(tok / 1000) + "k", "$" + Number(r.costUsd || 0).toFixed(4), Math.round(r.wallSec || 0) + " s", errs(r), codes(r)];
+  const cells = [short(r.models && r.models.shopper), r.scenario, r.profile, String(r.score), r.captured + " / " + r.shipped, Math.round(tok / 1000) + "k", "$" + cost(r).toFixed(4), Math.round(r.wallSec || 0) + " s", errs(r), codes(r)];
   console.log(md ? "| " + cells.join(" | ") + " |" : cells.join(" | "));
 }
 console.log((md ? "\n" : "") + rows.length + " rows for " + label);
