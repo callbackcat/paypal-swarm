@@ -31,12 +31,14 @@ services:
         value: "400000"
       - key: LLM_CACHE
         value: "0"
+      # The demo runs every agent on Haiku 5.5: that is how the README numbers were measured and it keeps a run at cents.
+      # Switch the merchant and analyst to anthropic/claude-sonnet-5.5 for a stronger merchant at about 5x the cost.
       - key: SWARM_MODEL_SHOPPER
         value: anthropic/claude-haiku-5.5
       - key: SWARM_MODEL_MERCHANT
-        value: anthropic/claude-sonnet-5.5
+        value: anthropic/claude-haiku-5.5
       - key: SWARM_MODEL_ANALYST
-        value: anthropic/claude-sonnet-5.5
+        value: anthropic/claude-haiku-5.5
       # --- secrets: set in the dashboard; leave empty to stay in mock / scripted mode ---
       - key: PAYPAL_CLIENT_ID
         sync: false

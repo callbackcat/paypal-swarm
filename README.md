@@ -260,7 +260,7 @@ Register `https://<api host>/webhooks/paypal` under Sandbox Webhooks in the deve
 
 `render.yaml` is a Render blueprint for `swarm-api` and a Postgres instance. Blueprints → New → this repo, then fill the `sync: false` secrets or leave them empty for mock mode. The web app deploys to Vercel: project root `apps/web`, with `NEXT_PUBLIC_API_URL` set to the api URL (the build inlines it).
 
-The api runs at https://swarm-api-ppdd.onrender.com ([`/docs`](https://swarm-api-ppdd.onrender.com/docs), [`/healthz`](https://swarm-api-ppdd.onrender.com/healthz)) against the PayPal sandbox. It is on Render's free plan, which sleeps after 15 minutes without traffic, so the first request after a pause can take a minute or so.
+The api runs at https://swarm-api-ppdd.onrender.com ([`/docs`](https://swarm-api-ppdd.onrender.com/docs), [`/healthz`](https://swarm-api-ppdd.onrender.com/healthz)) against the PayPal sandbox. It is on Render's free plan, which sleeps after 15 minutes without traffic, so the first request after a pause can take a minute or so. The demo api runs every agent on Haiku 5.5, which is how the numbers above were measured; set `SWARM_MODEL_MERCHANT` and `SWARM_MODEL_ANALYST` to a Sonnet id for a stronger merchant at about five times the cost.
 
 ## Tests and scripts
 
