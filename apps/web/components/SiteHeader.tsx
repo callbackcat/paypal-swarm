@@ -14,7 +14,7 @@ const NAV = [
 export function SiteHeader() {
   const path = usePathname() ?? "/";
   return (
-    <header className="border-b border-line bg-panel">
+    <header className="sticky top-0 z-(--z-raised) border-b border-line bg-panel">
       <div className="flex h-12 items-center justify-between gap-6 px-6">
         <Link href="/" className="flex min-w-0 shrink-0 items-center gap-1.5 type-code text-text-1">
           {/* eslint-disable-next-line @next/next/no-img-element -- a 1 KB static SVG; next/image adds nothing here */}

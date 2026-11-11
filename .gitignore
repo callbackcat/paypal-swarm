@@ -18,3 +18,5 @@ scripts/.spike-last.json
 /.kiro/
 /.claude/skills/
 /skills-lock.json
+
+.vercel

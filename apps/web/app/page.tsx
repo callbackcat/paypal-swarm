@@ -21,6 +21,7 @@ import {
   ValueSkeleton,
 } from "@/components/ui";
 import { SwarmLauncher } from "@/components/SwarmLauncher";
+import { HowItWorksSteps } from "@/components/HowItWorks";
 import {
   Engine,
   Measured,
@@ -129,26 +130,6 @@ const PAYPAL_ITEMS = [
   { value: "sandbox", label: "Sandbox" },
 ];
 const DEFAULT_SCENARIO = "black-friday";
-/** The long form of the three steps, for the How it works dialog. */
-const ABOUT: Array<[string, string]> = [
-  [
-    "Describe",
-    "One sentence: who the shoppers are, what to break, which merchant. A preset works too. A model turns it into a plan; keywords do when no model is available.",
-  ],
-  [
-    "Confirm",
-    "The plan shows the scenario, the merchant profile, the shoppers, the model and the estimated cost before anything is spent. Hard caps stop a runaway run: per-turn output tokens, per-actor caps, an admission stop at 80 percent and a scripted fallback at 100 percent.",
-  ],
-  [
-    "Watch, then read",
-    "The Arena streams every agent turn and PayPal call live, with the order board, the webhook ticker and human approvals. The Report scores the run 0 to 100 across four dimensions and names the fix behind each finding; the Studio is the deep dive. Re-run with the hardened merchant and watch the score move.",
-  ],
-  [
-    "What is simulated",
-    "Buyer approval is a card confirm in the sandbox, chargebacks come from the sandbox-only endpoint, and without credentials PayPal calls go to an in-process mock with the same tool names and error codes. Every report states its modes.",
-  ],
-];
-
 export default function SetupPage() {
   const router = useRouter();
   const [data, setData] = useState<ScenariosResponse | null>(null);
@@ -342,7 +323,7 @@ export default function SetupPage() {
             One sentence releases LLM shoppers and a chaos agent on your PayPal
             sandbox. You get a score and the fix behind every finding.
           </p>
-          <Button variant="ghost" size="sm" onClick={() => setAbout(true)}>
+          <Button variant="secondary" onClick={() => setAbout(true)}>
             <Icon icon={Information} />
             How it works
           </Button>
@@ -369,29 +350,13 @@ export default function SetupPage() {
           <DialogHeader>
             <DialogTitle>how a run works</DialogTitle>
           </DialogHeader>
-          <DialogBody>
-            <DialogDescription>
-              Swarm finds the gaps an agent that shops for a human would hit at
-              your checkout, on a sandbox, for cents. Nothing touches a real
-              PayPal account unless you give it sandbox credentials.
+          <DialogBody className="gap-4 p-5">
+            <DialogDescription className="mx-auto text-center">
+              Swarm sends AI shoppers at your PayPal sandbox store and scores
+              how it copes. No real money moves.
             </DialogDescription>
-            <ol className="mt-4 flex flex-col divide-y divide-line-faint">
-              {ABOUT.map(([title, body], i) => (
-                <li key={title} className="flex gap-4 py-3">
-                  <span className="type-label text-text-3">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="flex flex-col gap-1">
-                    <span className="type-body text-text-1">{title}</span>
-                    <span className="type-body-sm text-text-2">{body}</span>
-                  </span>
-                </li>
-              ))}
-            </ol>
+            <HowItWorksSteps />
           </DialogBody>
-          <DialogFooter>
-            <DialogClose>Close</DialogClose>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

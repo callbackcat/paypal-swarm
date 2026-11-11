@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import {
   Activity,
   ArrowUpRight,
@@ -56,6 +56,13 @@ import {
 } from "@/components/sodium/ui/table";
 import { Tag } from "@/components/sodium/ui/tag";
 import { cn } from "@/lib/sodium/utils";
+import { StackLogo, type StackLogoName } from "@/components/StackLogos";
+import { useRevealProgress, useTicker } from "@/components/LandingMotion";
+import {
+  PathsRailLine,
+  usePathsRail,
+  WayNumber,
+} from "@/components/PathsRail";
 
 /**
  * The Setup page below the launcher, in the order of a product page: the stack, two ways to run, how the score is
@@ -74,15 +81,18 @@ export function focusLauncher() {
     ?.focus({ preventScroll: true });
 }
 
-const STACK = [
-  "PayPal Agent Toolkit",
-  "PayPal Server SDK",
-  "PayPal Sandbox",
-  "OpenRouter",
-  "Vercel AI SDK",
-  "AG Grid Studio",
-  "Hono",
-  "Next.js",
+// PayPal is one wide cell naming its three parts, so the mark shows once; the cell takes the width of the three it replaces.
+const STACK: { name: string; logo: StackLogoName; wide?: boolean }[] = [
+  {
+    name: "PayPal Agent Toolkit · Server SDK · Sandbox",
+    logo: "paypal",
+    wide: true,
+  },
+  { name: "OpenRouter", logo: "openrouter" },
+  { name: "Vercel AI SDK", logo: "vercel" },
+  { name: "AG Grid Studio", logo: "ag" },
+  { name: "Hono", logo: "hono" },
+  { name: "Next.js", logo: "next" },
 ];
 
 /** One wide landing section: a rule above, the page gutter, generous air. */
@@ -118,11 +128,18 @@ function Heading({ title, children }: { title: string; children?: ReactNode }) {
 /** Three short facts: a glyph, a mono name, one line. */
 function Facts({
   items,
+  className,
 }: {
   items: Array<{ icon: typeof Lightning; title: string; line: string }>;
+  className?: string;
 }) {
   return (
-    <ul className="flex flex-col divide-y divide-line-faint border-y border-line-faint">
+    <ul
+      className={cn(
+        "flex flex-col divide-y divide-line-faint border-y border-line-faint",
+        className,
+      )}
+    >
       {items.map((f) => (
         <li
           key={f.title}
@@ -151,13 +168,16 @@ function Still({
   label,
   className,
   children,
+  ref,
 }: {
   label: string;
   className?: string;
   children: ReactNode;
+  ref?: Ref<HTMLDivElement>;
 }) {
   return (
     <div
+      ref={ref}
       role="img"
       aria-label={label}
       inert
@@ -168,41 +188,57 @@ function Still({
   );
 }
 
-/** The Arena, reduced: the strip and four orders of the measured Black Friday baseline run. */
+type ArenaRow = {
+  who: string;
+  amount: string;
+  status: "captured" | "declined";
+  line: string;
+};
+
+// The order feed, oldest first. The last four are the orders of the measured Black Friday baseline run and are what
+// the still shows at rest; the six before them are stand-ins in the same shape, so the board has something to cycle.
+const ARENA_FEED: ArenaRow[] = [
+  { who: "Mateo Ruiz", amount: "$34.00", status: "captured", line: "no tracking for 21:02" },
+  { who: "Priya Patel", amount: "$29.00", status: "captured", line: "no tracking for 21:15" },
+  { who: "Omar Haddad", amount: "$18.50", status: "captured", line: "no tracking for 21:31" },
+  { who: "Freya Novak", amount: "$50.50", status: "declined", line: "0500 at capture" },
+  { who: "Leo Marsh", amount: "$34.00", status: "captured", line: "no tracking for 21:58" },
+  { who: "Elena Rossi", amount: "$29.00", status: "captured", line: "no tracking for 22:10" },
+  { who: "Yuki Lindqvist", amount: "$50.50", status: "captured", line: "no tracking for 23:47" },
+  { who: "Sofia Costa", amount: "$29.00", status: "captured", line: "no tracking for 22:44" },
+  { who: "Noah Byrne", amount: "$18.50", status: "declined", line: "0500 at capture" },
+  { who: "Hana Tanaka", amount: "$50.50", status: "captured", line: "no tracking for 22:36" },
+];
+const ARENA_SHOWN = 4;
+const ARENA_TOTALS = { created: 37, captured: 31, declined: 4 };
+
+/**
+ * The Arena, reduced: the strip and the order board of the measured Black Friday baseline run. While it is in view a
+ * new order lands at the top every couple of seconds and the oldest leaves; the counts climb with it and reach the
+ * totals of the run on the last order of the feed, then the feed starts over. At rest it shows those totals.
+ */
 function ArenaStill() {
-  const rows: Array<{
-    who: string;
-    amount: string;
-    status: "captured" | "declined";
-    line: string;
-  }> = [
-    {
-      who: "Hana Tanaka",
-      amount: "$50.50",
-      status: "captured",
-      line: "no tracking for 22:36",
-    },
-    {
-      who: "Noah Byrne",
-      amount: "$18.50",
-      status: "declined",
-      line: "0500 at capture",
-    },
-    {
-      who: "Sofia Costa",
-      amount: "$29.00",
-      status: "captured",
-      line: "no tracking for 22:44",
-    },
-    {
-      who: "Yuki Lindqvist",
-      amount: "$50.50",
-      status: "captured",
-      line: "no tracking for 23:47",
-    },
-  ];
+  const L = ARENA_FEED.length;
+  const { ref, n } = useTicker<HTMLDivElement>(L, 1800);
+  // Orders are numbered from 1 in the order they land; order k is ARENA_FEED[(k - 1) % L].
+  const at = (n - 1) % L;
+  const later = ARENA_FEED.slice(at + 1);
+  const counts = {
+    created: ARENA_TOTALS.created - later.length,
+    captured:
+      ARENA_TOTALS.captured - later.filter((r) => r.status === "captured").length,
+    declined:
+      ARENA_TOTALS.declined - later.filter((r) => r.status === "declined").length,
+  };
+  const rows = Array.from({ length: ARENA_SHOWN }, (_, i) => {
+    const k = n - i;
+    return { k, row: ARENA_FEED[(k - 1) % L]! };
+  });
   return (
-    <Still label="The Arena of a Black Friday run: 37 orders, 31 captured, 4 declined, and the order board">
+    <Still
+      ref={ref}
+      label="The Arena of a Black Friday run: 37 orders, 31 captured, 4 declined, and the order board with new orders arriving"
+    >
       <Frame variant="panel">
         <StatusStrip
           variant="plain"
@@ -212,23 +248,23 @@ function ArenaStill() {
           <StatusStripCell>
             <StatusStripLabel>Orders</StatusStripLabel>
             <StatusStripValue>
-              37 <StatusStripUnit>created</StatusStripUnit>
+              {counts.created} <StatusStripUnit>created</StatusStripUnit>
             </StatusStripValue>
           </StatusStripCell>
           <StatusStripCell>
             <StatusStripLabel>Captured</StatusStripLabel>
             <StatusStripValue>
-              31 <StatusStripUnit>0 shipped</StatusStripUnit>
+              {counts.captured} <StatusStripUnit>0 shipped</StatusStripUnit>
             </StatusStripValue>
           </StatusStripCell>
           <StatusStripCell>
             <StatusStripLabel>Declined</StatusStripLabel>
             <StatusStripValue>
-              4 <StatusStripUnit>0 refunded</StatusStripUnit>
+              {counts.declined} <StatusStripUnit>0 refunded</StatusStripUnit>
             </StatusStripValue>
           </StatusStripCell>
         </StatusStrip>
-        <Table size="sm" title="Orders" count={37}>
+        <Table size="sm" title="Orders" count={counts.created}>
           <TableHeader>
             <TableRow>
               <TableHead>Shopper</TableHead>
@@ -238,8 +274,12 @@ function ArenaStill() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
-              <TableRow key={r.who}>
+            {rows.map(({ k, row: r }, i) => (
+              // Keyed by the number of the order, so the newest row mounts and plays its arrival; the rest only move down.
+              <TableRow
+                key={k}
+                className={i === 0 && n > L ? "landing-row-in" : undefined}
+              >
                 <TableCell>{r.who}</TableCell>
                 <TableCell numeric>{r.amount}</TableCell>
                 <TableCell>
@@ -327,15 +367,22 @@ function ReportStill() {
     { name: "Fulfilment", value: 36 },
     { name: "Resilience", value: 100 },
   ];
+  // The score and the four bars count up from zero once, when the report scrolls into view.
+  const { ref, progress } = useRevealProgress<HTMLDivElement>();
   return (
-    <Still label="A readiness report: 79 of 100, grade B; fulfilment 36 because 31 captures never got tracking">
+    <Still
+      ref={ref}
+      label="A readiness report: 79 of 100, grade B; fulfilment 36 because 31 captures never got tracking"
+    >
       <Frame variant="panel">
         <FrameHeader>
           <FrameTitle>Readiness</FrameTitle>
           <FrameValue meta>grade B of 100</FrameValue>
         </FrameHeader>
         <FrameBody className="flex flex-row items-end justify-between gap-6">
-          <span className="type-figure text-text-1">79</span>
+          <span className="type-figure text-text-1 tabular-nums">
+            {Math.round(79 * progress)}
+          </span>
           <span className="max-w-measure-hint text-end type-caption text-text-2">
             31 captures never got tracking: 40 points off fulfilment. The
             hardened merchant scored 99.
@@ -346,7 +393,7 @@ function ReportStill() {
             <Meter
               key={d.name}
               size="sm"
-              value={d.value}
+              value={Math.round(d.value * progress)}
               warnAt={null}
               failAt={null}
             >
@@ -370,48 +417,50 @@ export function StackStrip() {
       >
         {STACK.map((s) => (
           <li
-            key={s}
-            className="flex min-h-(--row) items-center justify-center bg-page px-3 text-center type-label text-text-1"
+            key={s.name}
+            className={cn(
+              "flex flex-col items-center justify-center gap-3 bg-page px-3 py-4 text-center type-label text-text-1",
+              s.wide && "col-span-2 sm:col-span-3",
+            )}
           >
-            {s}
+            {/* The name takes the spare height, so a two-line name and a one-line name leave their marks on one line. */}
+            <span className="flex flex-1 items-center">{s.name}</span>
+            <StackLogo name={s.logo} className="size-6 shrink-0" />
           </li>
         ))}
+        {/* Five single cells leave a hole in the two-column grid on a phone; this fills it with the page ground. */}
+        <li aria-hidden="true" className="bg-page sm:hidden" />
       </ul>
     </Section>
   );
 }
 
 export function Paths({ onSettings }: { onSettings: () => void }) {
+  const rail = usePathsRail();
   return (
     <Section>
       <Heading title="Two ways to run it.">
         Same shoppers, same chaos, same merchant agents. Only the keys change.
       </Heading>
 
-      <div className="flex flex-col gap-12 lg:gap-16">
-        <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
-          <div className="flex flex-col gap-6">
+      {/* Each way is a numbered heading with its text set in from the number, so the rail has a clear run beside it. */}
+      <div ref={rail.boxRef} className="relative flex flex-col gap-12 lg:gap-16">
+        <PathsRailLine geometry={rail.geometry} drawn={rail.drawn} />
+        <div
+          data-way
+          className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14"
+        >
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-6">
+            <WayNumber n={1} lit={rail.firstLit} ref={rail.firstRef} />
             <div className="flex flex-col gap-2">
-              <h3 className="type-heading-sm text-text-1">On the demo store</h3>
+              <h3 className="type-heading text-text-1">On the demo store</h3>
               <p className="type-body text-text-2">
                 No keys, no setup. Describe the crowd, confirm the cost, watch
                 it happen.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={focusLauncher}>
-                Release the swarm
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                render={<Link href="/runs" />}
-                nativeButton={false}
-              >
-                Finished runs
-              </Button>
-            </div>
             <Facts
+              className="col-start-2"
               items={[
                 {
                   icon: Lightning,
@@ -434,21 +483,26 @@ export function Paths({ onSettings }: { onSettings: () => void }) {
           <ArenaStill />
         </div>
 
-        <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14">
+        <div
+          data-way
+          className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14"
+        >
           <div className="lg:order-first">
             <SettingsStill />
           </div>
-          <div className="flex flex-col gap-6">
+          <div
+            ref={rail.endRef}
+            className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-6"
+          >
+            <WayNumber n={2} lit={rail.secondLit} ref={rail.secondRef} />
             <div className="flex flex-col gap-2">
-              <h3 className="type-heading-sm text-text-1">
-                On your own sandbox
-              </h3>
+              <h3 className="type-heading text-text-1">On your own sandbox</h3>
               <p className="type-body text-text-2">
                 Paste a sandbox client id and secret. The swarm reads your
                 catalog and captures your orders.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="col-start-2 flex flex-wrap gap-2">
               <Button variant="secondary" size="sm" onClick={onSettings}>
                 Open settings
               </Button>
@@ -469,6 +523,7 @@ export function Paths({ onSettings }: { onSettings: () => void }) {
               </Button>
             </div>
             <Facts
+              className="col-start-2"
               items={[
                 {
                   icon: Locked,
@@ -587,6 +642,33 @@ const MEASURED: Array<{
   },
 ];
 
+const LOWEST_BASELINE = Math.min(...MEASURED.map((m) => m.baseline));
+
+// The three numbers the table below adds up to, each the edge of its measured range.
+const MEASURED_KEYS: Array<{
+  label: string;
+  figure: string;
+  line: string;
+  tone?: string;
+}> = [
+  {
+    label: "Cost per run",
+    figure: "< $0.06",
+    line: "$0.007 to $0.058 at list prices",
+  },
+  {
+    label: "Hardened score",
+    figure: "99+",
+    line: "99 or 100 on all four, up from 79 to 90",
+    tone: "text-ok-text",
+  },
+  {
+    label: "Wall time",
+    figure: "< 3 min",
+    line: "64 to 169 seconds a run",
+  },
+];
+
 export function Measured() {
   return (
     <Section>
@@ -595,6 +677,20 @@ export function Measured() {
         2026.
       </Heading>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+        {/* One ruled row of the key numbers, large, so the section reads before the table does. */}
+        <dl className="frame grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {MEASURED_KEYS.map((k) => (
+            <div key={k.label} className="flex flex-col gap-1 p-4">
+              <dt className="type-micro text-text-3">{k.label}</dt>
+              <dd className="flex flex-col gap-1">
+                <span className={cn("type-figure", k.tone ?? "text-text-1")}>
+                  {k.figure}
+                </span>
+                <span className="type-caption text-text-2">{k.line}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
         <Table
           size="sm"
           title="Cost and score per scenario"
@@ -617,8 +713,20 @@ export function Measured() {
                 <TableCell numeric>{m.shoppers}</TableCell>
                 <TableCell numeric>{m.cost}</TableCell>
                 <TableCell numeric>{m.wall}</TableCell>
-                <TableCell numeric>{String(m.baseline)}</TableCell>
-                <TableCell numeric>{String(m.hardened)}</TableCell>
+                {/* Baseline scores in yellow, the lowest of them in red; hardened in green. */}
+                <TableCell
+                  numeric
+                  className={
+                    m.baseline === LOWEST_BASELINE
+                      ? "text-fail-text"
+                      : "text-accent-text"
+                  }
+                >
+                  {String(m.baseline)}
+                </TableCell>
+                <TableCell numeric className="text-ok-text">
+                  {String(m.hardened)}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -666,8 +774,9 @@ export function Questions() {
         {FAQ.map(([q, a]) => (
           <Collapsible key={q}>
             <CollapsibleTrigger>{q}</CollapsibleTrigger>
-            <CollapsibleContent>
-              <p className="p-inset pt-0 type-body-sm text-text-2">{a}</p>
+            {/* A little air under the question, and more under the answer, so the open row reads as one block. */}
+            <CollapsibleContent className="pt-2 pb-5">
+              <p>{a}</p>
             </CollapsibleContent>
           </Collapsible>
         ))}

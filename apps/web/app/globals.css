@@ -4,3 +4,8 @@ html { color-scheme: dark; }
 .ag-studio-host { height: calc(100dvh - 12rem); min-height: 40rem; }
 .ag-studio-host > * { height: 100%; width: 100%; }
 html, body { margin: 0; }
+
+/* The landing page's order board: a new order arrives under the selection wash, which then clears. */
+@keyframes landing-row-in { from { background-color: var(--selected); opacity: 0; } 30% { opacity: 1; } to { opacity: 1; } }
+.landing-row-in { animation: landing-row-in 900ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .landing-row-in { animation: none; } }

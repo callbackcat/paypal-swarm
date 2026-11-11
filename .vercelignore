@@ -1,0 +1,17 @@
+# The Vercel CLI does not apply the `.next-*/` rule from .gitignore, so local
+# review builds (apps/web/.next-build, .next-review) were uploaded: 234 MB.
+node_modules
+.next
+.next-*
+.turbo
+dist
+coverage
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.git
+.agents
+.kiro
+.claude
