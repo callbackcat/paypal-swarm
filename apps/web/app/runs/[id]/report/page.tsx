@@ -5,6 +5,7 @@ import { api, fmtLag, fmtSim, fmtTokens, fmtUsd, isTerminal, type Dimension, typ
 import { summarize } from "@/lib/arena";
 import { ErrorAlert, LinkButton, ModeTags, RunStatus, SeverityTag } from "@/components/ui";
 import { ReportCharts } from "@/components/ReportCharts";
+import { BarBlocks, type BarBlock } from "@/components/sodium/ui/bar-blocks";
 import { Button } from "@/components/sodium/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleGroup, CollapsibleTrigger } from "@/components/sodium/ui/collapsible";
 import { DataList, DataListItem, DataListLabel, DataListValue } from "@/components/sodium/ui/data-list";
@@ -17,6 +18,8 @@ import { StatusStrip, StatusStripCell, StatusStripLabel, StatusStripUnit, Status
 import { Tag } from "@/components/sodium/ui/tag";
 
 const DIM_LABEL: Record<Dimension, string> = { discoverability: "Discoverability", transactability: "Transactability", fulfilment: "Fulfilment", resilience: "Resilience" };
+// The share of the overall score each dimension carries; the same numbers as DIMENSION_WEIGHTS in packages/core/src/score.ts.
+const DIM_WEIGHT: Record<Dimension, number> = { discoverability: 0.2, transactability: 0.35, fulfilment: 0.25, resilience: 0.2 };
 const DIM_BLURB: Record<Dimension, string> = {
   discoverability: "Can agents find the right product? Position bias, prompt-injection susceptibility.",
   transactability: "Do payments complete correctly? Duplicate captures, unhandled declines, refund errors.",
@@ -111,6 +114,14 @@ export default function ReportPage() {
   const otherProfile = meta.merchantProfile === "hardened" ? "baseline" : "hardened";
   const simulated = meta.paypalMode === "mock" || meta.llmMode === "scripted";
   const untracked = stats.captured - stats.shipped;
+  // The hundred points as blocks: what the store kept, then what each dimension cost it, weighted as the score weighs them.
+  const pointBlocks: BarBlock[] = [
+    { label: "Kept", value: score.overall },
+    ...(Object.keys(DIM_LABEL) as Dimension[])
+      .map((d) => ({ label: DIM_LABEL[d], value: (100 - score.dimensions[d]) * DIM_WEIGHT[d], tone: "fail" as const }))
+      .filter((b) => b.value > 0)
+      .sort((a, b) => b.value - a.value),
+  ];
 
   return (
     <>
@@ -147,7 +158,12 @@ export default function ReportPage() {
       </div>
       <ErrorAlert error={error} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {/* One row: the score, the order timeline and the spend. The dimensions and the run's numbers follow under it. */}
+      <ReportCharts
+        runId={id}
+        report={report}
+        events={allEvents}
+        lead={
         <Frame variant="panel" aria-label="Readiness score">
           <FrameHeader>
             <FrameTitle>Readiness</FrameTitle>
@@ -163,12 +179,21 @@ export default function ReportPage() {
               {score.overall}
             </p>
           </FrameBody>
+          <FrameBody className="flex flex-1 flex-col justify-end gap-2">
+            <p className="type-micro text-text-3">Where the 100 points went</p>
+            <BarBlocks
+              label={`Where the 100 points went: ${pointBlocks.map((b) => `${b.label} ${Math.round(b.value * 10) / 10}`).join(", ")}`}
+              data={pointBlocks}
+              valueFormat={(v) => (v < 10 && v % 1 !== 0 ? v.toFixed(1) : String(Math.round(v)))}
+            />
+          </FrameBody>
           <FrameBody>
             <FrameDescription>Weighted deductions per finding, capped per rule. Rate limits are infrastructure and never score.</FrameDescription>
           </FrameBody>
         </Frame>
-
-        <Frame aria-label="Dimensions" className="lg:col-span-2">
+        }
+      >
+        <Frame aria-label="Dimensions">
           <FrameHeader>
             <FrameTitle>Dimensions</FrameTitle>
             <FrameValue meta>{score.deductions.length} deductions</FrameValue>
@@ -199,7 +224,6 @@ export default function ReportPage() {
             </ul>
           </FrameBody>
         </Frame>
-      </div>
 
       <StatusStrip label="Run statistics">
         <StatusStripCell>
@@ -248,8 +272,7 @@ export default function ReportPage() {
           </StatusStripValue>
         </StatusStripCell>
       </StatusStrip>
-
-      <ReportCharts runId={id} report={report} events={allEvents} />
+      </ReportCharts>
 
       <Frame aria-label="Findings">
         <FrameHeader>

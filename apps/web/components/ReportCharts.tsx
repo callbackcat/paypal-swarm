@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, fmtSim, fmtTokens, fmtUsd, type Dimension, type Report, type SwarmEvent } from "@/lib/api";
 import { BarBlocks, type BarBlock } from "@/components/sodium/ui/bar-blocks";
 import { Chart } from "@/components/sodium/ui/chart";
@@ -68,7 +68,23 @@ const delta = (a: number, b: number): { word: string; status: StatusValue } => {
   return { word: "same", status: "idle" };
 };
 
-export function ReportCharts({ runId, report, events }: { runId: string; report: Report; events: SwarmEvent[] }) {
+/**
+ * The report's charts. `lead` is a card that takes the first place in the top row, beside the order timeline and
+ * the spend (the page puts the readiness score there); `children` sit under that row, above the before and after.
+ */
+export function ReportCharts({
+  runId,
+  report,
+  events,
+  lead,
+  children,
+}: {
+  runId: string;
+  report: Report;
+  events: SwarmEvent[];
+  lead?: ReactNode;
+  children?: ReactNode;
+}) {
   const { stats, meta, score } = report;
   const timeline = useMemo(() => orderTimeline(events, stats.simMinutes), [events, stats.simMinutes]);
   const spend = useMemo(() => spendByClass(events), [events]);
@@ -102,8 +118,9 @@ export function ReportCharts({ runId, report, events }: { runId: string; report:
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      {lead}
       <Chart
-        className="lg:col-span-2"
+        className={lead ? undefined : "lg:col-span-2"}
         type="line"
         curve="step"
         frame="frame"
@@ -135,6 +152,8 @@ export function ReportCharts({ runId, report, events }: { runId: string; report:
           </FrameDescription>
         </FrameBody>
       </Frame>
+
+      {children ? <div className="flex flex-col gap-6 lg:col-span-3">{children}</div> : null}
 
       <Frame aria-label="Before and after" className="lg:col-span-3">
         <FrameHeader>
