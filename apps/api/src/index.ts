@@ -31,6 +31,24 @@ async function main() {
     node.keepAliveTimeout = 65_000;
     node.headersTimeout = 66_000;
   }
+  keepAwake();
+}
+
+/**
+ * Render's free instances sleep after 15 minutes without inbound traffic and take about a minute to wake. On Render
+ * the api requests its own public /healthz every 10 minutes, which counts as traffic and keeps it awake. Nothing
+ * runs off Render (RENDER_EXTERNAL_URL is set only there), and KEEP_AWAKE=0 turns it off.
+ */
+function keepAwake() {
+  const url = process.env.RENDER_EXTERNAL_URL?.trim();
+  if (!url || process.env.KEEP_AWAKE === "0") return;
+  const ping = () =>
+    fetch(`${url}/healthz`, { signal: AbortSignal.timeout(30_000) })
+      .then((r) => console.log(`[keep-awake] ${url}/healthz ${r.status}`))
+      .catch((e) => console.warn(`[keep-awake] ping failed: ${String((e as Error).message ?? e)}`));
+  const timer = setInterval(ping, 10 * 60_000);
+  timer.unref();
+  console.log(`[keep-awake] pinging ${url}/healthz every 10 minutes`);
 }
 
 main().catch((e) => {
