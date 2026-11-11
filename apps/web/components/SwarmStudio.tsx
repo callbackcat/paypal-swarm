@@ -158,7 +158,7 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
   const ai = useCallback(
     (params: AgAiHarnessSetupParams) => {
       const adapter = swarmAdapter({ runId, onUsage: (u) => setUsage((s) => ({ turns: s.turns + 1, tokens: s.tokens + u.inputTokens + u.outputTokens, costUsd: s.costUsd + u.costUsd })) });
-      const harness = createAiHarness(params.api as AgStudioApi, ({ tools: { studio }, builtIn }) => ({
+      const harness = createAiHarness(params.api as AgStudioApi, ({ tools: { studio, delegateTo }, builtIn }) => ({
         primary: "analyst",
         promptStarters,
         agents: [
@@ -173,9 +173,13 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
                 "You are the Swarm analyst inside AG Studio. The dataset is the event log of one simulated agentic-commerce run against a PayPal store.",
                 describe(run, report, stateRef.current),
                 "Work method: call viewSchema once, then executeQuery to check the numbers, then addWidget with a clear title. Prefer one precise widget over three vague ones. Always say in one sentence what the widget reveals about agent-readiness and which readiness rule it relates to.",
+                // addWidget only places an empty widget; AG Studio's widget agent is the one that binds fields to it.
+                "A widget is created in two steps and is empty until the second is done. Step 1: addWidget places it and returns its widget id. Step 2: call delegate_to with the widget agent, passing that widget id, its widget type and a precise brief: the table, the field for each axis or column, the aggregation, the sort and the title. Delegate once per widget, and delegate all widgets of one request in the same response. Never finish while a widget you added is unconfigured, and never tell the user to bind fields themselves.",
+                // Without sizes the analyst placed charts 6 rows tall (96px), too small to read.
+                "Size widgets so they can be read. The page grid is 24 columns wide and its rows are 16px tall (viewPage reports pageLayout). A chart or a table is at least 12 columns wide and 18 rows tall: one alone takes all 24 columns, two sit side by side at 12 each. A value tile is 6 to 8 columns wide and 6 rows tall. Put new widgets under the ones already on the page, never on top of them.",
                 "Keep answers short. Never invent PayPal ids; only cite ids present in the data.",
               ].join("\n\n"),
-            tools: () => [studio.viewSchema(), studio.viewReport(), studio.viewPage(), studio.executeQuery(), studio.addWidget(), studio.removeWidget(), studio.positionWidget(), studio.addPageFilter(), studio.removePageFilter(), studio.addWidgetFilter(), studio.createExpression()],
+            tools: () => [studio.viewSchema(), studio.viewReport(), studio.viewPage(), studio.executeQuery(), studio.addWidget(), studio.removeWidget(), studio.positionWidget(), studio.addPageFilter(), studio.removePageFilter(), studio.addWidgetFilter(), studio.createExpression(), delegateTo(["widget"])],
           }),
           ...(["data", "widget", "page", "planning", "lead"] as const).map((k) => directLlmRunner({ ...builtIn[k], adapter })),
         ],
@@ -220,7 +224,8 @@ export default function SwarmStudio({ runId, autoPrompt }: { runId: string; auto
       </div>
       <div className="ag-studio-host frame overflow-hidden">
         <AgStudioProvider modules={[AgStudioAiModule]} licenseKey={licenseKey}>
-          <AgStudio mode="edit" data={data} ai={ai} onStudioReady={onStudioReady} />
+          {/* The filters panel is left out: with four panels open the page canvas was 200px wide and every widget a thumbnail. */}
+          <AgStudio mode="edit" data={data} ai={ai} onStudioReady={onStudioReady} panels={{ edit: { left: ["ai"], right: ["edit", "data"] } }} />
         </AgStudioProvider>
       </div>
     </div>
