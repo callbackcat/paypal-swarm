@@ -22,6 +22,7 @@ import {
 } from "@/components/ui";
 import { SwarmLauncher } from "@/components/SwarmLauncher";
 import { HowItWorksSteps } from "@/components/HowItWorks";
+import { PayPalMark } from "@/components/StackLogos";
 import {
   Engine,
   Measured,
@@ -317,7 +318,10 @@ export default function SetupPage() {
       >
         <div className="flex flex-col items-center gap-4 text-center">
           <h1 className="type-display text-text-1">
-            Stress-test your checkout with a swarm of AI shoppers
+            Stress-test your checkout{" "}
+            {/* The PayPal mark from the Built on strip, in PayPal's own blues, set in the line at the height of the capitals (40px in a 56px headline). */}
+            <PayPalMark className="inline-block size-10 align-baseline" />{" "}
+            with a swarm of AI shoppers
           </h1>
           <p className="max-w-measure type-body text-text-2">
             One sentence releases LLM shoppers and a chaos agent on your PayPal

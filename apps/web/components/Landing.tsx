@@ -66,20 +66,10 @@ import {
 
 /**
  * The Setup page below the launcher, in the order of a product page: the stack, two ways to run, how the score is
- * made, the measured numbers, questions, and a last call back to the launcher. The pictures are small coded replicas
- * of the Arena, the settings and the Report, drawn with the same components and the numbers of one real run
- * (haiku-9nov-b black-friday baseline, 9 Nov 2026). Every figure on the page is a measured one.
+ * made, the measured numbers and questions. The pictures are small coded replicas of the Arena, the settings and the
+ * Report, drawn with the same components and the numbers of one real run (haiku-9nov-b black-friday baseline,
+ * 9 Nov 2026). Every figure on the page is a measured one; the order board also cycles six stand-in orders.
  */
-
-/** Scrolls back to the launcher and puts the caret in the box. */
-export function focusLauncher() {
-  document
-    .getElementById("launch")
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  document
-    .querySelector<HTMLTextAreaElement>('[data-slot="prompt-input-text"]')
-    ?.focus({ preventScroll: true });
-}
 
 // PayPal is one wide cell naming its three parts, so the mark shows once; the cell takes the width of the three it replaces.
 const STACK: { name: string; logo: StackLogoName; wide?: boolean }[] = [
