@@ -732,7 +732,16 @@ export function Measured() {
           </TableBody>
         </Table>
         <p className="text-center type-caption text-text-2">
-          Recorded tokens at list prices. Eight more models in the README.
+          Recorded tokens at list prices. Eight more models in the{" "}
+          <a
+            href="https://github.com/callbackcat/paypal-swarm#model-comparison-and-pricing-guide"
+            target="_blank"
+            rel="noreferrer"
+            className="text-accent-text underline decoration-1 underline-offset-4 hover:text-text-1"
+          >
+            README
+          </a>
+          .
         </p>
       </div>
     </Section>

@@ -33,6 +33,15 @@ export function SiteHeader() {
           <a href={API + "/docs"} target="_blank" rel="noreferrer" className="type-label text-text-2 hover:text-text-1">
             API docs
           </a>
+          {/* The one link out to the code: yellow and underlined, so it reads as a link beside the plain section names. */}
+          <a
+            href="https://github.com/callbackcat/paypal-swarm"
+            target="_blank"
+            rel="noreferrer"
+            className="type-label text-accent-text underline decoration-1 underline-offset-4 hover:text-text-1"
+          >
+            GitHub
+          </a>
         </nav>
       </div>
     </header>
