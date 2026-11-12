@@ -273,12 +273,20 @@ export class RunManager {
     return buildReport(events, { runId: id, name: run.name, scenario: run.scenario, merchantProfile: run.merchantProfile, paypalMode: modes?.paypal, llmMode: modes?.llm, tokenCap: run.tokenCap, startedAt: run.startedAt ?? undefined, finishedAt: run.finishedAt ?? undefined });
   }
 
+  /** Whose OpenRouter key a re-run of this run would spend. */
+  async rerunKeySource(id: string, patch: Partial<RunConfig>): Promise<Modes["llmKeySource"]> {
+    return this.resolveModes(await this.rerunConfig(id, patch)).llmKeySource;
+  }
+
   async rerun(id: string, patch: Partial<RunConfig>, ip?: string) {
+    return this.create(await this.rerunConfig(id, patch), { ip, start: true });
+  }
+
+  private async rerunConfig(id: string, patch: Partial<RunConfig>): Promise<RunConfig> {
     const run = await this.store.getRun(id);
     if (!run) throw new HttpError(404, "run not found");
     const secrets = run.credentialsEnc ? decryptJson<{ credentials?: RunConfig["credentials"]; openrouterApiKey?: string }>(run.credentialsEnc) : undefined;
-    const config: RunConfig = { ...run.config, ...patch, credentials: secrets?.credentials, openrouterApiKey: secrets?.openrouterApiKey, name: patch.name ?? `${run.name.replace(/ · (baseline|hardened).*$/, "")} · ${patch.merchantProfile ?? run.merchantProfile} (re-run)` };
-    return this.create(config, { ip, start: true });
+    return { ...run.config, ...patch, credentials: secrets?.credentials, openrouterApiKey: secrets?.openrouterApiKey, name: patch.name ?? `${run.name.replace(/ · (baseline|hardened).*$/, "")} · ${patch.merchantProfile ?? run.merchantProfile} (re-run)` };
   }
 
   /** Route an inbound webhook event into a live run's world (so it gets a sim time) or straight to the store. */

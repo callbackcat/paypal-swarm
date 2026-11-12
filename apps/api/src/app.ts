@@ -5,6 +5,7 @@ import { swaggerUI } from "@hono/swagger-ui";
 import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
+import { ACCESS_HEADER, accessCodeOk, accessGateOn } from "./access";
 import type { Bus } from "./bus";
 import type { Env } from "./env";
 import { HttpError, RunManager } from "./runs";
@@ -28,19 +29,25 @@ const json = (schema: z.ZodTypeAny, description: string) => ({ description, cont
 export function createApp(deps: AppDeps) {
   const { store, bus, manager, env } = deps;
   const app = new OpenAPIHono({ defaultHook: (result, c) => (result.success ? undefined : c.json({ error: result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") }, 400)) });
-  app.use("*", cors({ origin: env().corsOrigin === "*" ? "*" : env().corsOrigin.split(","), allowHeaders: ["Content-Type", "Authorization", "Last-Event-ID", "X-OpenRouter-Key"], exposeHeaders: ["Content-Type"] }));
+  app.use("*", cors({ origin: env().corsOrigin === "*" ? "*" : env().corsOrigin.split(","), allowHeaders: ["Content-Type", "Authorization", "Last-Event-ID", "X-OpenRouter-Key", ACCESS_HEADER], exposeHeaders: ["Content-Type"] }));
   app.onError((e, c) => {
     if (e instanceof HttpError) return c.json({ error: e.message }, e.status as 400);
     console.error(e);
     return c.json({ error: String((e as Error).message ?? e) }, 500);
   });
 
+  /** A run on the server's own OpenRouter key spends real money: it needs the judge access code. */
+  const requireAccess = (c: { req: { header: (name: string) => string | undefined } }, llmKeySource: string) => {
+    if (llmKeySource !== "demo" || !accessGateOn()) return;
+    if (!accessCodeOk(c.req.header(ACCESS_HEADER))) throw new HttpError(401, "Live runs need the access code.");
+  };
+
   // --- health -----------------------------------------------------------------------------------
   app.openapi(
     createRoute({ method: "get", path: "/healthz", tags: ["platform"], responses: { 200: json(Any, "Service health, storage kind and which integrations are configured") } }),
     async (c) => {
       const e = env();
-      return c.json({ ok: await store.ping(), service: "swarm-api", version: SWARM_VERSION, storage: store.kind, paypal: e.paypal ? "sandbox" : "mock", llm: e.openrouterKey ? "live" : "scripted", webhooks: !!e.webhookId, activeRuns: manager.active.size });
+      return c.json({ ok: await store.ping(), service: "swarm-api", version: SWARM_VERSION, storage: store.kind, paypal: e.paypal ? "sandbox" : "mock", llm: e.openrouterKey ? "live" : "scripted", accessGate: accessGateOn(), webhooks: !!e.webhookId, activeRuns: manager.active.size });
     },
   );
 
@@ -64,9 +71,10 @@ export function createApp(deps: AppDeps) {
     (c) => c.json(manager.estimate(c.req.valid("json"))),
   );
   app.openapi(
-    createRoute({ method: "post", path: "/runs", tags: ["runs"], request: { body: { content: { "application/json": { schema: RunConfigSchema } } } }, responses: { 201: json(Any, "Run created and started"), 400: json(Err, "Over cap or bad config"), 429: json(Err, "Demo allowance exhausted") } }),
+    createRoute({ method: "post", path: "/runs", tags: ["runs"], request: { body: { content: { "application/json": { schema: RunConfigSchema } } } }, responses: { 201: json(Any, "Run created and started"), 400: json(Err, "Over cap or bad config"), 401: json(Err, "Access code missing or wrong (live runs on the demo key)"), 429: json(Err, "Demo allowance exhausted") } }),
     async (c) => {
       const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? c.req.header("cf-connecting-ip") ?? "local";
+      requireAccess(c, manager.resolveModes(c.req.valid("json")).llmKeySource);
       const r = await manager.create(c.req.valid("json"), { ip, start: true });
       const { credentialsEnc: _e, ...run } = r.run;
       return c.json({ ...run, modes: r.modes, estimate: r.estimate }, 201);
@@ -110,11 +118,20 @@ export function createApp(deps: AppDeps) {
     createRoute({ method: "post", path: "/runs/{id}/rerun", tags: ["runs"], request: { params: IdParam, body: { content: { "application/json": { schema: z.object({ merchantProfile: z.enum(["baseline", "hardened"]).optional(), name: z.string().optional() }) } } } }, responses: { 201: json(Any, "New run started with the same config (and credentials) and the given merchant profile") } }),
     async (c) => {
       const ip = c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+      requireAccess(c, await manager.rerunKeySource(c.req.valid("param").id, c.req.valid("json")));
       const r = await manager.rerun(c.req.valid("param").id, c.req.valid("json"), ip);
       const { credentialsEnc: _e, ...run } = r.run;
       return c.json({ ...run, modes: r.modes, estimate: r.estimate, rerunOf: c.req.valid("param").id }, 201);
     },
   );
+
+  // --- access ----------------------------------------------------------------------------------
+  app.openAPIRegistry.registerPath({ method: "post", path: "/access", tags: ["platform"], summary: "Check the access code that live runs on the demo key need", request: { body: { content: { "application/json": { schema: z.object({ code: z.string() }) } } } }, responses: { 200: { description: "{ ok: true }" }, 401: { description: "Wrong code" } } });
+  app.post("/access", async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { code?: unknown };
+    if (!accessCodeOk(typeof body.code === "string" ? body.code : undefined)) return c.json({ error: "That code is not right." }, 401);
+    return c.json({ ok: true });
+  });
 
   // --- SSE --------------------------------------------------------------------------------------
   app.openAPIRegistry.registerPath({ method: "get", path: "/runs/{id}/events", tags: ["runs"], summary: "Live event stream (SSE)", description: "Server-sent events. `?since=<eventId>` replays from the log first (also honours Last-Event-ID). Heartbeat comment every 15 s. Sends `event: done` when the run has finished.", request: { params: IdParam, query: z.object({ since: z.coerce.number().int().nonnegative().optional() }) }, responses: { 200: { description: "text/event-stream" } } });

@@ -1,4 +1,5 @@
 import type { Dimension, Finding, Persona, Report, Scenario, Severity, SwarmEvent } from "@swarm/core";
+import { ACCESS_HEADER, askForAccessCode, storeAccessCode, storedAccessCode } from "./access";
 
 export type { Dimension, Finding, Persona, Report, Scenario, Severity, SwarmEvent };
 
@@ -154,11 +155,31 @@ async function j<T>(path: string, init?: RequestInit): Promise<T> {
 }
 const post = <T>(path: string, body: unknown) => j<T>(path, { method: "POST", body: JSON.stringify(body) });
 
+/**
+ * A request that may spend the demo OpenRouter key. It carries the stored access code; when the api answers 401 the
+ * access dialog opens once, and the request goes again after the person enters the code.
+ */
+async function gated<T>(path: string, body: unknown): Promise<T> {
+  const send = () => {
+    const code = storedAccessCode();
+    return j<T>(path, { method: "POST", body: JSON.stringify(body), headers: code ? { [ACCESS_HEADER]: code } : undefined });
+  };
+  try {
+    return await send();
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 401) throw e;
+    storeAccessCode(null);
+    if (!(await askForAccessCode())) throw new ApiError(401, "A live run needs the access code. Enter it to start, or switch the run to scripted in settings.");
+    return send();
+  }
+}
+
 export const api = {
   health: () => j<{ ok: boolean; storage: string; paypal: string; llm: string; webhooks: boolean; activeRuns: number; version: string }>("/healthz"),
   scenarios: () => j<ScenariosResponse>("/scenarios"),
   estimate: (cfg: RunConfigInput) => post<{ scenario: string; shoppers: number; tokenCap: number; modes: Modes; estimate: Estimate }>("/runs/estimate", cfg),
-  createRun: (cfg: RunConfigInput) => post<RunStatus & { modes: Modes; estimate: Estimate }>("/runs", cfg),
+  createRun: (cfg: RunConfigInput) => gated<RunStatus & { modes: Modes; estimate: Estimate }>("/runs", cfg),
+  checkAccess: (code: string) => post<{ ok: boolean }>("/access", { code }),
   planRun: (text: string) => post<PlanResult>("/ai/plan-run", { text }),
   listRuns: () => j<{ runs: RunListItem[] }>("/runs"),
   getRun: (id: string) => j<RunStatus>(`/runs/${id}`),
@@ -169,7 +190,7 @@ export const api = {
     if (!res.ok) throw new ApiError(res.status, res.statusText);
     return res.text();
   },
-  rerun: (id: string, body: { merchantProfile?: "baseline" | "hardened"; name?: string }) => post<RunStatus & { rerunOf: string }>(`/runs/${id}/rerun`, body),
+  rerun: (id: string, body: { merchantProfile?: "baseline" | "hardened"; name?: string }) => gated<RunStatus & { rerunOf: string }>(`/runs/${id}/rerun`, body),
   pause: (id: string) => post<{ id: string }>(`/runs/${id}/pause`, {}),
   resume: (id: string) => post<{ id: string }>(`/runs/${id}/resume`, {}),
   stop: (id: string) => post<{ id: string }>(`/runs/${id}/stop`, {}),

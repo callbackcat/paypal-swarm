@@ -50,6 +50,9 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+      # The code a live run on the key above needs. Set it in the dashboard; unset turns the gate off.
+      - key: SWARM_ACCESS_CODE
+        sync: false
 
 databases:
   - name: swarm-db
