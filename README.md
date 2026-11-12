@@ -285,4 +285,4 @@ The nightly GitHub Action runs typecheck, tests, migrations and a smoke run; wit
 
 PayPal Agent Toolkit · PayPal Server SDK (APIMatic) · PayPal sandbox REST · Vercel AI SDK v6 · OpenRouter (Claude Haiku 5.5 / Sonnet 5.5 by default; benchmarked on eight models) · AG Studio 3.1 · Hono · Next.js 15 · Drizzle + Postgres · Render · ascii-magic-art (MIT) for the diagram
 
-Built solo for the PayPal AI Hackathon, November 2026. MIT licence, see `LICENSE`.
+Built by a team of two for the PayPal AI Hackathon, November 2026. MIT licence, see `LICENSE`.

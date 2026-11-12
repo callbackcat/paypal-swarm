@@ -187,7 +187,7 @@ webhooks(id, run_id, event_type, resource_id, received_at, raw_json, matched_eve
 
 ---
 
-## 10. Seven days (Nov 5–11), hours are for a solo build with Claude Code
+## 10. Seven days (Nov 5–11), hours are for a two-person build with Claude Code
 
 | Day | Goal | Hours | Done when |
 |---|---|---|---|
@@ -207,7 +207,7 @@ Scope-cut order if behind: subscriptions scenario → AG Grid Studio (keep plain
 
 | t | Shot | Line |
 |---|---|---|
-| 0:00 | You, webcam, plain | "Next year your customers will be ChatGPT and Gemini. Nobody can test what fifty of them do to a checkout. So I built the thing that does." |
+| 0:00 | You, webcam, plain | "Next year your customers will be ChatGPT and Gemini. Nobody can test what fifty of them do to a checkout. So we built the thing that does." |
 | 0:15 | Setup screen | "Sandbox keys, demo catalog, scenario: Black Friday, 40 shoppers, 10% declines. Each agent only gets the PayPal tools it needs." (hover allow-list) |
 | 0:30 | Arena, 2× speed | Shoppers browsing, orders capturing, tracking created. Cut to PayPal sandbox dashboard filling with the same order IDs. |
 | 1:05 | Arena, chaos | "Then the chaos agent wakes up." Decline, oversized refund, three disputes. Merchant agent pauses for your approval on one; you approve. |
